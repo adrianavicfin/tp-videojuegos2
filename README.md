@@ -1,2 +1,7 @@
 # tp-videojuegos2
-proyecto integrador para la materia programación de videojuegos 2
+
+Proyecto integrador para la materia programación de videojuegos II - UNAHUR
+
+**Integrantes**
+Adriana Victoria Finoquetto
+Damián Bruque Lopez
