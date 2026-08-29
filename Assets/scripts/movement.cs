@@ -18,11 +18,29 @@ namespace CosmosCritters
         void Start()
         {
             inputMove = 0f;
+            isGrounded = false;
         }
 
         // Update is called once per frame
         void Update()
         {
+            inputMove = Input.GetAxisRaw("Horizontal");
+
+            if(Input.GetButtonDown("Jump") && isGrounded)
+            {
+                rb.AddForce(Vector2.up * jumpForce, ForceMode2D.Impulse);
+                isGrounded = false;
+            }   
+
+            if(inputMove != 0f)
+            {
+                rb.AddForce(Vector2.right * inputMove * moveForce);
+            }
+
+            rb.velocity = new Vector2(
+                Mathf.Clamp(rb.velocity.x, -maxVel, maxVel),
+                rb.velocity.y
+            );
             //inputMove = 0f;
 
             //if (Keyboard.current != null)
