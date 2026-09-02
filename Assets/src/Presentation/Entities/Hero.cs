@@ -4,6 +4,7 @@ namespace CosmosCritters
 {
     /// <summary>
     /// Héroe alienígena controlado por jugador en la cola de turnos.
+    /// Configura dinámicamente su modelo de estadísticas y conecta con el presentador del HUD.
     /// </summary>
     public class Hero : Character
     {
@@ -15,11 +16,13 @@ namespace CosmosCritters
 
         protected override void Awake()
         {
-            base.Awake();
-
             if (_heroData != null)
             {
                 Initialize(_heroData, SlotIndex);
+            }
+            else
+            {
+                base.Awake();
             }
         }
 
@@ -32,9 +35,12 @@ namespace CosmosCritters
             {
                 _characterName = _heroData.HeroName;
                 _maxHealth = _heroData.MaxHealth;
-                _currentHealth = _maxHealth;
                 _moveSpeed = _heroData.MoveSpeed;
                 _jumpForce = _heroData.JumpForce;
+
+                UnbindStatsEvents();
+                Stats = new CharacterStats(_heroData.HeroName, _heroData.MaxHealth, _heroData.MoveSpeed, _heroData.JumpForce);
+                BindStatsEvents();
 
                 if (_spriteRenderer != null && _heroData.CharacterSprite != null)
                 {
@@ -55,7 +61,7 @@ namespace CosmosCritters
         }
         #endregion
 
-        #region Actions Execution (Patrón Command - Hito 1)
+        #region Actions Execution (Patrón Command)
         public void ExecuteAction(ICharacterAction action, Character target = null)
         {
             if (action == null) return;
