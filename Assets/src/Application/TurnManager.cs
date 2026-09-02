@@ -5,231 +5,271 @@ using UnityEngine;
 namespace CosmosCritters
 {
     /// <summary>
-    /// Orquestador del flujo de combate por turnos y árbitro de la partida.
-    /// Gestiona la cola polimórfica de Characters (Héroes, Boss, Esbirros), el countdown y las fases de turno.
+    /// Orquestador del flujo de combate por turnos, FSM de fases y resolución de victoria/derrota.
+    /// Consume las dependencias temporales vía IoC y configura los slots de héroes con los datos persistidos de GameManager (Hito 2).
     /// </summary>
     public class TurnManager : MonoBehaviour
     {
         public static TurnManager Instance { get; private set; }
 
-        #region Events
+        public event Action<TurnPhase> OnPhaseChanged;
         public event Action<Character> OnTurnStarted;
         public event Action<Character> OnTurnEnded;
-        public event Action<TurnPhase> OnPhaseChanged;
-        public event Action<float> OnCountdownTick; // Tiempo restante en segundos
-        public event Action<int> OnRoundChanged;     // Número de ronda global
-        public event Action<bool> OnMatchFinished;  // true = Victoria de Héroes, false = Derrota
-        #endregion
+        public event Action<int> OnRoundStarted;
+        public event Action<bool> OnMatchFinished; // true = Win, false = Defeat
 
-        [Header("Turn Settings")]
-        [SerializeField] private float _turnDuration = 30f;
+        [Header("Match Settings")]
+        [SerializeField] private float _turnDuration = 15f;
         [SerializeField] private List<Hero> _heroSlots = new List<Hero>();
         [SerializeField] private Boss _boss;
-        [SerializeField] private List<Minion> _minions = new List<Minion>();
 
-        // Inyectado vía IoC
         private ICountdownTimer _turnTimer;
-
-        #region Internal State
         private readonly Queue<Character> _turnQueue = new Queue<Character>();
-        private readonly List<Character> _allCombatants = new List<Character>();
-
         private Character _activeCharacter;
         private TurnPhase _currentPhase = TurnPhase.WaitingInput;
-        private int _currentRound = 1;
-        private bool _isMatchOver;
-        #endregion
+        private int _currentRound = 0;
+        private bool _isMatchOver = false;
 
         #region Properties
         public Character ActiveCharacter => _activeCharacter;
         public TurnPhase CurrentPhase => _currentPhase;
         public int CurrentRound => _currentRound;
-        public float RemainingTime => _turnTimer?.RemainingTime ?? 0f;
-        public bool IsMatchOver => _isMatchOver;
+        public ICountdownTimer TurnTimer => _turnTimer;
         #endregion
 
-        #region Unity Lifecycle & Inversion of Control
+        #region Unity Lifecycle & Inyección IoC
         private void Awake()
         {
-            if (Instance == null)
-            {
-                Instance = this;
-                // Inyección automática de dependencias desde el IoC
-                IoCContainer.Instance.Inject(this);
-            }
-            else
+            if (Instance != null && Instance != this)
             {
                 Destroy(gameObject);
+                return;
+            }
+            Instance = this;
+
+            if (GameManager.Instance != null && GameManager.Instance.Container != null)
+            {
+                GameManager.Instance.Container.Inject(this);
             }
         }
 
-        /// <summary>
-        /// Inyección de dependencias pasiva mediante IoC (Construct).
-        /// </summary>
         public void Construct(ICountdownTimer turnTimer)
         {
             _turnTimer = turnTimer;
-            _turnTimer.OnTick += (remaining) => OnCountdownTick?.Invoke(remaining);
-            _turnTimer.OnFinished += EndCurrentTurn;
+
+            if (_turnTimer != null)
+            {
+                _turnTimer.OnFinished += HandleTurnTimerFinished;
+            }
         }
 
         private void Start()
         {
-            InitializeCombatants();
+            ApplyPersistentMatchSettings();
+            SubscribeCombatantEvents();
             StartNewRound();
+        }
+
+        private void OnDestroy()
+        {
+            if (_turnTimer != null)
+            {
+                _turnTimer.OnFinished -= HandleTurnTimerFinished;
+            }
+            UnsubscribeCombatantEvents();
         }
 
         private void Update()
         {
             if (_isMatchOver || _turnTimer == null) return;
 
-            if (_currentPhase == TurnPhase.WaitingInput)
+            if (_currentPhase == TurnPhase.WaitingInput && _turnTimer.IsRunning)
             {
                 _turnTimer.Tick(Time.deltaTime);
             }
         }
         #endregion
 
-        #region Match & Queue Setup
-        private void InitializeCombatants()
+        #region Settings Persistence Consumer (Hito 2)
+        private void ApplyPersistentMatchSettings()
         {
-            _allCombatants.Clear();
-
-            // 1. Configurar Héroes según los slots activos
-            foreach (var hero in _heroSlots)
+            if (GameManager.Instance != null && GameManager.Instance.CurrentMatchSettings != null)
             {
-                if (hero != null && hero.gameObject.activeSelf && !hero.IsDead)
+                MatchSettings settings = GameManager.Instance.CurrentMatchSettings;
+                _turnDuration = settings.TurnDuration;
+
+                // Configurar los slots de héroes con los ScriptableObjects seleccionados en el Menú
+                if (settings.SelectedHeroes != null && settings.SelectedHeroes.Count > 0)
                 {
-                    _allCombatants.Add(hero);
-                    hero.OnDied += () => HandleCharacterDied(hero);
-                }
-            }
-
-            // 2. Configurar Boss
-            if (_boss != null && !_boss.IsDead)
-            {
-                _allCombatants.Add(_boss);
-                _boss.OnDied += () => HandleCharacterDied(_boss);
-            }
-
-            // 3. Configurar Esbirros
-            foreach (var minion in _minions)
-            {
-                if (minion != null && minion.gameObject.activeSelf && !minion.IsDead)
-                {
-                    _allCombatants.Add(minion);
-                    minion.OnDied += () => HandleCharacterDied(minion);
+                    for (int i = 0; i < _heroSlots.Count; i++)
+                    {
+                        if (i < settings.SelectedHeroes.Count && _heroSlots[i] != null)
+                        {
+                            _heroSlots[i].gameObject.SetActive(true);
+                            _heroSlots[i].Initialize(settings.SelectedHeroes[i], i + 1);
+                        }
+                    }
                 }
             }
         }
+        #endregion
 
+        #region Queue & Combat Flow
         private void StartNewRound()
         {
             if (_isMatchOver) return;
 
+            _currentRound++;
+            _currentPhase = TurnPhase.WaitingInput;
             Debug.Log($"[TurnManager] === Iniciando Ronda {_currentRound} ===");
+            OnRoundStarted?.Invoke(_currentRound);
+
+            RebuildTurnQueue();
+            AdvanceToNextTurn();
+        }
+
+        private void RebuildTurnQueue()
+        {
             _turnQueue.Clear();
 
-            foreach (var combatant in _allCombatants)
+            for (int i = 0; i < _heroSlots.Count; i++)
             {
-                if (combatant != null && !combatant.IsDead)
+                if (_heroSlots[i] != null && !_heroSlots[i].IsDead && _heroSlots[i].gameObject.activeSelf)
                 {
-                    _turnQueue.Enqueue(combatant);
+                    _turnQueue.Enqueue(_heroSlots[i]);
                 }
             }
 
-            OnRoundChanged?.Invoke(_currentRound);
-            AdvanceToNextTurn();
+            if (_boss != null && !_boss.IsDead)
+            {
+                _turnQueue.Enqueue(_boss);
+            }
         }
-        #endregion
 
-        #region Turn Flow Execution
         public void AdvanceToNextTurn()
         {
             if (_isMatchOver) return;
 
             if (_turnQueue.Count == 0)
             {
-                _currentRound++;
                 StartNewRound();
                 return;
             }
 
             _activeCharacter = _turnQueue.Dequeue();
 
-            if (_activeCharacter == null || _activeCharacter.IsDead)
+            if (_activeCharacter.IsDead)
             {
                 AdvanceToNextTurn();
                 return;
             }
 
             SetPhase(TurnPhase.WaitingInput);
-            _turnTimer.Start(_turnDuration);
+
+            if (_turnTimer != null)
+            {
+                _turnTimer.Start(_turnDuration);
+            }
 
             _activeCharacter.StartTurn();
             OnTurnStarted?.Invoke(_activeCharacter);
         }
 
-        public void NotifyActionExecuting()
-        {
-            _turnTimer.Pause();
-            SetPhase(TurnPhase.ActionExecuting);
-        }
-
-        public void NotifyActionResolved()
-        {
-            SetPhase(TurnPhase.Resolving);
-            CheckMatchEndConditions();
-
-            if (!_isMatchOver)
-            {
-                EndCurrentTurn();
-            }
-        }
-
         public void EndCurrentTurn()
         {
-            _turnTimer.Stop();
-
             if (_activeCharacter != null)
             {
                 _activeCharacter.EndTurn();
                 OnTurnEnded?.Invoke(_activeCharacter);
             }
 
+            if (_turnTimer != null)
+            {
+                _turnTimer.Stop();
+            }
+
             AdvanceToNextTurn();
         }
 
-        private void SetPhase(TurnPhase phase)
+        private void HandleTurnTimerFinished()
         {
-            _currentPhase = phase;
-            OnPhaseChanged?.Invoke(_currentPhase);
+            Debug.Log("[TurnManager] ¡Tiempo agotado para el turno activo!");
+            EndCurrentTurn();
         }
         #endregion
 
-        #region Victory / Defeat Conditions
-        private void HandleCharacterDied(Character character)
+        #region Phase Transitions
+        public void SetPhase(TurnPhase newPhase)
         {
-            Debug.Log($"[TurnManager] El combatiente {character.CharacterName} ha caído.");
-            CheckMatchEndConditions();
+            _currentPhase = newPhase;
+            OnPhaseChanged?.Invoke(_currentPhase);
         }
 
-        private void CheckMatchEndConditions()
+        public void NotifyActionExecuting()
         {
-            if (_isMatchOver) return;
-
-            // 1. Chequear si el Boss murió (Victoria)
-            if (_boss == null || _boss.IsDead)
+            SetPhase(TurnPhase.ActionExecuting);
+            if (_turnTimer != null)
             {
-                FinishMatch(victory: true);
-                return;
+                _turnTimer.Pause();
+            }
+        }
+
+        public void NotifyActionResolved()
+        {
+            SetPhase(TurnPhase.Resolving);
+            CheckEndGameConditions();
+
+            if (!_isMatchOver)
+            {
+                EndCurrentTurn();
+            }
+        }
+        #endregion
+
+        #region Combat Conditions & Event Subscriptions
+        private void SubscribeCombatantEvents()
+        {
+            if (_boss != null)
+            {
+                _boss.OnDied += HandleBossDied;
             }
 
-            // 2. Chequear si todos los Héroes murieron (Derrota)
-            bool anyHeroAlive = false;
-            foreach (var hero in _heroSlots)
+            for (int i = 0; i < _heroSlots.Count; i++)
             {
-                if (hero != null && !hero.IsDead && hero.gameObject.activeSelf)
+                if (_heroSlots[i] != null)
+                {
+                    _heroSlots[i].OnDied += HandleHeroDied;
+                }
+            }
+        }
+
+        private void UnsubscribeCombatantEvents()
+        {
+            if (_boss != null)
+            {
+                _boss.OnDied -= HandleBossDied;
+            }
+
+            for (int i = 0; i < _heroSlots.Count; i++)
+            {
+                if (_heroSlots[i] != null)
+                {
+                    _heroSlots[i].OnDied -= HandleHeroDied;
+                }
+            }
+        }
+
+        private void HandleBossDied()
+        {
+            TriggerMatchEnd(true);
+        }
+
+        private void HandleHeroDied()
+        {
+            bool anyHeroAlive = false;
+            for (int i = 0; i < _heroSlots.Count; i++)
+            {
+                if (_heroSlots[i] != null && !_heroSlots[i].IsDead && _heroSlots[i].gameObject.activeSelf)
                 {
                     anyHeroAlive = true;
                     break;
@@ -238,16 +278,42 @@ namespace CosmosCritters
 
             if (!anyHeroAlive)
             {
-                FinishMatch(victory: false);
+                TriggerMatchEnd(false);
             }
         }
 
-        private void FinishMatch(bool victory)
+        private void CheckEndGameConditions()
         {
+            if (_boss != null && _boss.IsDead)
+            {
+                TriggerMatchEnd(true);
+            }
+            else
+            {
+                HandleHeroDied();
+            }
+        }
+
+        private void TriggerMatchEnd(bool isVictory)
+        {
+            if (_isMatchOver) return;
+
             _isMatchOver = true;
-            _turnTimer?.Stop();
-            Debug.Log(victory ? "[TurnManager] ¡VICTORIA! El Boss fue derrotado." : "[TurnManager] ¡DERROTA! Todos los héroes han caído.");
-            OnMatchFinished?.Invoke(victory);
+            if (_turnTimer != null)
+            {
+                _turnTimer.Stop();
+            }
+
+            if (isVictory)
+            {
+                Debug.Log("[TurnManager] ¡VICTORIA! El Boss fue derrotado.");
+            }
+            else
+            {
+                Debug.Log("[TurnManager] ¡DERROTA! Todos los héroes han caído.");
+            }
+
+            OnMatchFinished?.Invoke(isVictory);
         }
         #endregion
     }
