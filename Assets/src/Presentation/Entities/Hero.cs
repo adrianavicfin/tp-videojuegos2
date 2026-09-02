@@ -4,7 +4,7 @@ namespace CosmosCritters
 {
     /// <summary>
     /// Héroe alienígena controlado por jugador en la cola de turnos.
-    /// Configura dinámicamente su modelo de estadísticas y conecta con el presentador del HUD.
+    /// Configura su modelo de estadísticas y su Habilidad Secundaria Polimórfica (Hito 2).
     /// </summary>
     public class Hero : Character
     {
@@ -13,6 +13,11 @@ namespace CosmosCritters
 
         public HeroDataSO HeroData => _heroData;
         public int SlotIndex { get; private set; } = 1;
+
+        /// <summary>
+        /// Habilidad secundaria polimórfica asignada al héroe según su rol.
+        /// </summary>
+        public Ability SecondaryAbility { get; private set; }
 
         protected override void Awake()
         {
@@ -23,6 +28,7 @@ namespace CosmosCritters
             else
             {
                 base.Awake();
+                AssignDefaultSecondaryAbility();
             }
         }
 
@@ -46,6 +52,33 @@ namespace CosmosCritters
                 {
                     _spriteRenderer.sprite = _heroData.CharacterSprite;
                 }
+
+                AssignSecondaryAbilityByRole(_heroData.Role);
+            }
+        }
+
+        private void AssignDefaultSecondaryAbility()
+        {
+            SecondaryAbility = new HealAbility(25, 2);
+        }
+
+        private void AssignSecondaryAbilityByRole(HeroRole role)
+        {
+            switch (role)
+            {
+                case HeroRole.Support:
+                    SecondaryAbility = new HealAbility(35, 2);
+                    break;
+                case HeroRole.HeavyDamage:
+                    SecondaryAbility = new ShieldAbility(30, 3);
+                    break;
+                case HeroRole.GravitationalControl:
+                case HeroRole.Scout:
+                    SecondaryAbility = new TeleportAbility(3);
+                    break;
+                default:
+                    SecondaryAbility = new HealAbility(20, 2);
+                    break;
             }
         }
 
@@ -53,6 +86,7 @@ namespace CosmosCritters
         public override void StartTurn()
         {
             Debug.Log($"[TurnQueue] Turno activado para el Héroe: {_characterName} (Slot {SlotIndex})");
+            SecondaryAbility?.TickCooldown();
         }
 
         public override void EndTurn()
@@ -61,7 +95,7 @@ namespace CosmosCritters
         }
         #endregion
 
-        #region Actions Execution (Patrón Command)
+        #region Actions Execution (Patrón Command & Habilidades Polimórficas)
         public void ExecuteAction(ICharacterAction action, Character target = null)
         {
             if (action == null) return;
@@ -86,9 +120,16 @@ namespace CosmosCritters
             ExecuteAction(new ActionShoot(angle, power, damage), target);
         }
 
-        public void ExecuteAbility(string abilityName, int healAmount, Character target = null)
+        public void ExecuteSecondaryAbility(Character target = null)
         {
-            ExecuteAction(new ActionAbility(abilityName, healAmount), target);
+            if (SecondaryAbility != null)
+            {
+                SecondaryAbility.Trigger(this, target);
+            }
+            else
+            {
+                Debug.LogWarning("[Hero] No tiene ninguna habilidad secundaria asignada.");
+            }
         }
         #endregion
     }
