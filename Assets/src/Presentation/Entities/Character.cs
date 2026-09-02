@@ -4,10 +4,11 @@ using UnityEngine;
 namespace CosmosCritters
 {
     /// <summary>
-    /// Clase abstracta base para todas las entidades participantes en la cola de turnos (Héroes, Enemigos, Boss).
-    /// Integra el modelo de estadísticas de combate CharacterStats (Patrón MVP - Model).
+    /// Clase abstracta base para todas las entidades participantes en la cola de turnos.
+    /// Implementa IGravityAffected para interactuar con campos gravitatorios radiales en FixedUpdate.
     /// </summary>
-    public abstract class Character : MonoBehaviour
+    [RequireComponent(typeof(Rigidbody2D), typeof(Collider2D))]
+    public abstract class Character : MonoBehaviour, IGravityAffected
     {
         public event Action<int, int> OnHealthChanged; // (current, max)
         public event Action OnDied;
@@ -21,10 +22,17 @@ namespace CosmosCritters
         [SerializeField] protected float _moveSpeed = 5f;
         [SerializeField] protected float _jumpForce = 7f;
 
+        protected Rigidbody2D _rb;
+
         /// <summary>
         /// Modelo de datos de estado vivo en memoria (C# puro).
         /// </summary>
         public CharacterStats Stats { get; protected set; }
+
+        #region IGravityAffected Properties
+        public Rigidbody2D Rigidbody => _rb;
+        public Transform Transform => transform;
+        #endregion
 
         #region Properties
         public string CharacterName => Stats != null ? Stats.CharacterName : _characterName;
@@ -38,6 +46,7 @@ namespace CosmosCritters
         #region Unity Lifecycle
         protected virtual void Awake()
         {
+            _rb = GetComponent<Rigidbody2D>();
             if (_spriteRenderer == null)
                 _spriteRenderer = GetComponentInChildren<SpriteRenderer>();
 
@@ -73,7 +82,26 @@ namespace CosmosCritters
         private void HandleStatsDied() => OnDied?.Invoke();
         #endregion
 
-        #region Health Operations (Delegadas al Modelo de Dominio)
+        #region Physics & Radial Gravity (FixedUpdate)
+        public virtual void ApplyGravitationalPull(Vector2 force)
+        {
+            if (_rb != null && !_rb.isKinematic)
+            {
+                _rb.AddForce(force, ForceMode2D.Force);
+            }
+        }
+
+        public virtual void AlignWithSurface(Vector2 upDirection)
+        {
+            if (_rb == null || upDirection.sqrMagnitude < 0.001f) return;
+
+            float targetAngle = Mathf.Atan2(upDirection.y, upDirection.x) * Mathf.Rad2Deg - 90f;
+            float currentAngle = Mathf.LerpAngle(_rb.rotation, targetAngle, 10f * Time.fixedDeltaTime);
+            _rb.MoveRotation(currentAngle);
+        }
+        #endregion
+
+        #region Health Operations
         public virtual void TakeDamage(int amount)
         {
             if (Stats == null) return;
@@ -87,7 +115,7 @@ namespace CosmosCritters
         }
         #endregion
 
-        #region Turn Lifecycle (Polimorfismo para la Cola de Turnos)
+        #region Turn Lifecycle
         public abstract void StartTurn();
         public abstract void EndTurn();
         #endregion
