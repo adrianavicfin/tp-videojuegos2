@@ -5,10 +5,10 @@ namespace CosmosCritters
 {
     /// <summary>
     /// Clase abstracta base para todas las entidades participantes en la cola de turnos.
-    /// Implementa IGravityAffected para interactuar con campos gravitatorios radiales en FixedUpdate.
+    /// Implementa IDamageable e IGravityAffected.
     /// </summary>
     [RequireComponent(typeof(Rigidbody2D), typeof(Collider2D))]
-    public abstract class Character : MonoBehaviour, IGravityAffected
+    public abstract class Character : MonoBehaviour, IDamageable, IGravityAffected
     {
         public event Action<int, int> OnHealthChanged; // (current, max)
         public event Action OnDied;
@@ -34,7 +34,7 @@ namespace CosmosCritters
         public Transform Transform => transform;
         #endregion
 
-        #region Properties
+        #region IDamageable & Properties
         public string CharacterName => Stats != null ? Stats.CharacterName : _characterName;
         public int CurrentHealth => Stats != null ? Stats.CurrentHealth : _maxHealth;
         public int MaxHealth => Stats != null ? Stats.MaxHealth : _maxHealth;
@@ -101,7 +101,7 @@ namespace CosmosCritters
         }
         #endregion
 
-        #region Health Operations
+        #region Health Operations (IDamageable)
         public virtual void TakeDamage(int amount)
         {
             if (Stats == null) return;

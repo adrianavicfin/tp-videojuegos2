@@ -4,7 +4,7 @@ namespace CosmosCritters
 {
     /// <summary>
     /// Proyectil balístico físico afectado por gravedad radial en FixedUpdate.
-    /// Al detonar, inflige daño a enemigos y aplica Knockback físico a aliados (Friendly Fire Indirecto).
+    /// Al detonar, inflige daño a entidades y coberturas (IDamageable) y aplica Knockback físico a aliados.
     /// </summary>
     [RequireComponent(typeof(Rigidbody2D), typeof(Collider2D))]
     public class Projectile : MonoBehaviour, IGravityAffected
@@ -36,7 +36,6 @@ namespace CosmosCritters
 
         public void AlignWithSurface(Vector2 upDirection)
         {
-            // Opcional: orientar la punta del proyectil hacia su vector de velocidad
             if (_rb != null && _rb.velocity.sqrMagnitude > 0.1f)
             {
                 float angle = Mathf.Atan2(_rb.velocity.y, _rb.velocity.x) * Mathf.Rad2Deg;
@@ -87,25 +86,29 @@ namespace CosmosCritters
                 Vector2 direction = ((Vector2)col.transform.position - (Vector2)transform.position).normalized;
                 if (direction == Vector2.zero) direction = Vector2.up;
 
-                // 1. Si es un Character
+                // 1. Caso A: Es un Character (Héroe o Enemigo)
                 if (col.TryGetComponent<Character>(out var character))
                 {
                     bool isAlly = (_owner is Hero && character is Hero);
 
                     if (isAlly)
                     {
-                        // Friendly Fire Indirecto: Empuje físico sin restar puntos de salud
-                        Debug.Log($"[FriendlyFire] Aliado {character.CharacterName} empujado por onda expansiva (Knockback: {_knockbackForce})");
+                        // Friendly Fire Indirecto: Empuje físico sin daño
+                        Debug.Log($"[FriendlyFire] Aliado {character.CharacterName} empujado por la explosión.");
                         character.ApplyGravitationalPull(direction * _knockbackForce * 2f);
                     }
                     else
                     {
-                        // Daño directo a enemigos
                         character.TakeDamage(_damage);
                         character.ApplyGravitationalPull(direction * _knockbackForce);
                     }
                 }
-                // 2. Si es un Rigidbody2D genérico (escombros/coberturas)
+                // 2. Caso B: Es una Cobertura Destructible (DestructibleCover)
+                else if (col.TryGetComponent<DestructibleCover>(out var cover))
+                {
+                    cover.TakeDamage(_damage);
+                }
+                // 3. Caso C: Escombros o Rigidbody2D genérico
                 else if (col.TryGetComponent<Rigidbody2D>(out var rb) && !rb.isKinematic)
                 {
                     rb.AddForce(direction * _knockbackForce, ForceMode2D.Impulse);
@@ -117,7 +120,6 @@ namespace CosmosCritters
                 Instantiate(_explosionVfxPrefab, transform.position, Quaternion.identity);
             }
 
-            // Notificar al TurnManager que la acción terminó de resolverse
             if (TurnManager.Instance != null)
             {
                 TurnManager.Instance.NotifyActionResolved();
