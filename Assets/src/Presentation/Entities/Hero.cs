@@ -55,10 +55,35 @@ namespace CosmosCritters
         }
         #endregion
 
-        #region Actions
-        public void ExecuteMove(Vector2 direction) { }
-        public void ExecuteShoot(float angle, float force) { }
-        public void ExecuteAbility() { }
+        #region Actions Execution (Patrón Command - Hito 1)
+        public void ExecuteAction(ICharacterAction action, Character target = null)
+        {
+            if (action == null) return;
+
+            if (action.CanExecute(this))
+            {
+                action.Execute(this, target);
+            }
+            else
+            {
+                Debug.LogWarning($"[Hero] No se puede ejecutar la acción {action.ActionName}.");
+            }
+        }
+
+        public void ExecuteMove(Vector2 direction, float distance)
+        {
+            ExecuteAction(new ActionMove(direction, distance));
+        }
+
+        public void ExecuteShoot(float angle, float power, int damage, Character target)
+        {
+            ExecuteAction(new ActionShoot(angle, power, damage), target);
+        }
+
+        public void ExecuteAbility(string abilityName, int healAmount, Character target = null)
+        {
+            ExecuteAction(new ActionAbility(abilityName, healAmount), target);
+        }
         #endregion
     }
 }
