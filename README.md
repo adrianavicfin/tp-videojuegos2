@@ -1,7 +1,9 @@
 # 🌌 CosmosCritters
 
 > **Proyecto Integrador** — Programación de Videojuegos II
+>
 > **Universidad Nacional de Hurlingham (UNAHUR)** — 2do Cuatrimestre 2026 (Comisión 1)
+>
 > **Profesor:** Reynaga, Ignacio Daniel
 
 ---
@@ -18,7 +20,7 @@
 
 ### Nombre del videojuego
 
-Cosmos Critters ([link al repo](https://github.com/adrianavicfin/tp-videojuegos2))
+Cosmos Critters
 
 ### Pila tecnológica a utilizar
 
@@ -179,13 +181,15 @@ flowchart LR
 
 ## 🏛️ Diagramas UML
 
-### 📊 Diagrama UML Inicial (GDD)
+### 📊 1. Diagrama UML Inicial (GDD)
 
 ![Diagrama UML Inicial](diagrama_uml_inicial.png)
 
 ---
 
-### 📊 Diagrama UML de Implementación (Hito 1)
+### 📊 2. Diagrama UML de Arquitectura e Implementación (Hito 1 & Hito 2)
+
+Diagrama completo que refleja la totalidad del código en `Assets/src/` organizado en `/Data`, `/Rules`, `/Visual` y `/Core`:
 
 ```mermaid
 classDiagram
@@ -193,8 +197,10 @@ classDiagram
     class GameManager {
         -GameManager s_instance$
         +Instance$ GameManager
+        +MatchSettings CurrentMatchSettings
         -Awake() void
         -RegisterDependencies(IoCContainer container) void
+        +SetMatchSettings(MatchSettings settings) void
     }
 
     class IoCContainer {
@@ -207,7 +213,59 @@ classDiagram
         +Inject(object target) void
     }
 
-    %% Application / Rules
+    %% Data Layer (Pure C# & ScriptableObjects)
+    class CharacterStats {
+        +string CharacterName
+        +int MaxHealth
+        +int CurrentHealth
+        +float MoveSpeed
+        +float JumpForce
+        +bool IsDead
+        +event Action~int,int~ OnHealthChanged
+        +event Action OnDied
+        +ApplyDamage(int amount) void
+        +Heal(int amount) void
+    }
+
+    class MatchSettings {
+        +List~HeroDataSO~ SelectedHeroes
+        +int SelectedMapIndex
+        +float TurnDuration
+        +SetSelectedHeroes(List~HeroDataSO~ heroes) void
+        +SetMapIndex(int mapIndex) void
+        +SetTurnDuration(float duration) void
+    }
+
+    class HeroDataSO {
+        -string _heroName
+        -int _maxHealth
+        -float _moveSpeed
+        -HeroRole _role
+        +string HeroName
+        +int MaxHealth
+        +HeroRole Role
+    }
+
+    class WeaponDataSO {
+        -string _weaponName
+        -int _baseDamage
+        -float _explosionRadius
+        -float _knockbackForce
+        -GameObject _projectilePrefab
+        +int BaseDamage
+        +float ExplosionRadius
+        +float KnockbackForce
+        +GameObject ProjectilePrefab
+    }
+
+    class TerrainMaterialSO {
+        -string _materialName
+        -int _damageResistance
+        +string MaterialName
+        +int DamageResistance
+    }
+
+    %% Rules Layer (Logic, Presenters & Commands)
     class TurnManager {
         -Queue~Character~ _turnQueue
         -ICountdownTimer _turnTimer
@@ -220,24 +278,31 @@ classDiagram
         +NotifyActionResolved() void
     }
 
+    class PlayerHUDPresenter {
+        -IPlayerHUDView _view
+        -CharacterStats _model
+        -ICountdownTimer _turnTimer
+        +SetTurnActive(bool isActive) void
+        +Dispose() void
+    }
+
+    class MainMenuController {
+        -List~HeroDataSO~ _availableHeroes
+        -List~HeroDataSO~ _selectedHeroes
+        -int _selectedMapIndex
+        -float _turnDuration
+        +ToggleSelectHero(HeroDataSO hero) void
+        +SelectMap(int mapIndex) void
+        +SetTurnDuration(float duration) void
+        +StartMatch() void
+    }
+
     class ICountdownTimer {
         <<interface>>
         +float RemainingTime
-        +float TotalDuration
         +event Action~float~ OnTick
         +event Action OnFinished
         +Start(float duration) void
-        +Pause() void
-        +Resume() void
-        +Stop() void
-    }
-
-    class CountdownTimer {
-        -float _remainingTime
-        -float _totalDuration
-        -bool _isRunning
-        +Start(float duration) void
-        +Tick(float deltaTime) void
         +Stop() void
     }
 
@@ -248,112 +313,203 @@ classDiagram
         +Execute(Character user, Character target) void
     }
 
-    class ActionMove {
-        +Vector2 Direction
-        +float Distance
-        +CanExecute(Character user) bool
-        +Execute(Character user, Character target) void
+    class IDamageable {
+        <<interface>>
+        +int CurrentHealth
+        +int MaxHealth
+        +bool IsDead
+        +TakeDamage(int amount) void
+    }
+
+    class IGravityAffected {
+        <<interface>>
+        +Rigidbody2D Rigidbody
+        +Transform Transform
+        +ApplyGravitationalPull(Vector2 force) void
+        +AlignWithSurface(Vector2 upDirection) void
+    }
+
+    class IPlayerHUDView {
+        <<interface>>
+        +SetCharacterName(string name) void
+        +UpdateHealth(int current, int max) void
+        +SetTurnActiveState(bool isActive) void
+        +UpdateCountdown(float remainingSeconds) void
+    }
+
+    class Ability {
+        <<abstract>>
+        +string AbilityName
+        +int CooldownTurns
+        +int CurrentCooldown
+        +bool IsReady
+        +Trigger(Character user, Character target) void
+        +TickCooldown() void
+        #ExecuteEffect(Character user, Character target)* void
+    }
+
+    class HealAbility {
+        +int HealAmount
+        #ExecuteEffect(Character user, Character target) void
+    }
+
+    class ShieldAbility {
+        +int ShieldPoints
+        #ExecuteEffect(Character user, Character target) void
+    }
+
+    class TeleportAbility {
+        +Vector2 TargetPosition
+        #ExecuteEffect(Character user, Character target) void
     }
 
     class ActionShoot {
         +float Angle
         +float Power
         +int Damage
-        +CanExecute(Character user) bool
         +Execute(Character user, Character target) void
     }
 
-    class ActionAbility {
-        +string AbilityName
-        +int HealAmount
-        +CanExecute(Character user) bool
+    class ActionMove {
+        +Vector2 Direction
+        +float Distance
         +Execute(Character user, Character target) void
     }
 
-    %% Data
-    class HeroDataSO {
-        -string _heroName
-        -int _maxHealth
-        -float _moveSpeed
-        -HeroRole _role
-        +string HeroName
-        +int MaxHealth
-        +float MoveSpeed
-        +HeroRole Role
-    }
-
-    %% Presentation / Entities
+    %% Visual Layer (Unity MonoBehaviours, Physics & UI)
     class Character {
         <<abstract>>
-        #int _currentHealth
-        #int _maxHealth
-        #string _characterName
-        +int CurrentHealth
-        +bool IsDead
+        +CharacterStats Stats
         +TakeDamage(int amount) void
         +Heal(int amount) void
+        +ApplyGravitationalPull(Vector2 force) void
+        +AlignWithSurface(Vector2 upDirection) void
         +StartTurn()* void
         +EndTurn()* void
     }
 
     class Hero {
-        -HeroDataSO _heroData
-        +int SlotIndex
-        +Initialize(HeroDataSO data, int slotIndex) void
+        +HeroDataSO HeroData
+        +Ability SecondaryAbility
         +ExecuteAction(ICharacterAction action, Character target) void
-        +StartTurn() void
-        +EndTurn() void
+        +ExecuteSecondaryAbility(Character target) void
     }
 
     class Enemy {
         <<abstract>>
-        +StartTurn() void
-        +EndTurn() void
         +ExecuteAITurn()* void
     }
 
     class Boss {
         -int _currentPhase
-        -int _totalPhases
-        +int CurrentPhase
         +ExecuteAITurn() void
-        +TakeDamage(int amount) void
     }
 
     class Minion {
-        -float _attackDamage
         +ExecuteAITurn() void
     }
 
-    %% Relationships
-    GameManager ..> IoCContainer : registers services
-    TurnManager ..> ICountdownTimer : depends on (DIP)
-    CountdownTimer ..|> ICountdownTimer : implements
-    TurnManager o-- Character : manages turn queue
+    class GravityBody {
+        -float _gravityRadius
+        -float _gravityForce
+        -ApplyRadialGravity() void
+    }
 
+    class Projectile {
+        -int _damage
+        -float _explosionRadius
+        -float _knockbackForce
+        +Launch(Vector2 direction, float power, Character owner) void
+        +Explode() void
+    }
+
+    class DestructibleCover {
+        -TerrainMaterialSO _materialData
+        -int _currentIntegrity
+        +TakeDamage(int amount) void
+    }
+
+    class KillZoneView {
+        -OnTriggerExit2D(Collider2D other) void
+    }
+
+    class PlayerHUDView {
+        +SetCharacterName(string name) void
+        +UpdateHealth(int current, int max) void
+        +SetTurnActiveState(bool isActive) void
+        +UpdateCountdown(float remainingSeconds) void
+    }
+
+    %% Relationships
+    GameManager ..> IoCContainer : registers
+    GameManager o-- MatchSettings : persists
+    MainMenuController ..> GameManager : passes MatchSettings
+    TurnManager ..> GameManager : reads MatchSettings
+    TurnManager ..> ICountdownTimer : depends on (DIP)
+    TurnManager o-- Character : manages queue
+
+    PlayerHUDPresenter ..> CharacterStats : observes (Model)
+    PlayerHUDPresenter ..> IPlayerHUDView : updates (View)
+    PlayerHUDView ..|> IPlayerHUDView : implements
+
+    Character ..|> IDamageable : implements
+    Character ..|> IGravityAffected : implements
+    Character o-- CharacterStats : delegates stats
     Character <|-- Hero : inherits
     Character <|-- Enemy : inherits
     Enemy <|-- Boss : inherits
     Enemy <|-- Minion : inherits
 
     Hero o-- HeroDataSO : configured by
-    Hero ..> ICharacterAction : executes commands
+    Hero o-- Ability : possesses
+    Hero ..> ICharacterAction : executes
 
-    ActionMove ..|> ICharacterAction : implements
+    Ability <|-- HealAbility : inherits
+    Ability <|-- ShieldAbility : inherits
+    Ability <|-- TeleportAbility : inherits
+
     ActionShoot ..|> ICharacterAction : implements
-    ActionAbility ..|> ICharacterAction : implements
+    ActionMove ..|> ICharacterAction : implements
+
+    Projectile ..|> IGravityAffected : implements
+    DestructibleCover ..|> IDamageable : implements
+    DestructibleCover o-- TerrainMaterialSO : configured by
+
+    GravityBody ..> IGravityAffected : attracts
+    Projectile ..> IDamageable : damages
+    Projectile ..> Hero : knockback (Friendly Fire)
+    KillZoneView ..> Character : instant kill
+    KillZoneView ..> Projectile : destroys
 ```
 
 ---
 
-## 📁 Estructura del Código
+## 📁 Estructura del Código (Hito 2)
+
+El proyecto está estrictamente organizado según las pautas de la cátedra en:
 
 ```
 Assets/src/
-├── Core/                  # GameManager (Singleton), IoCContainer (Inversión de Control)
-├── Data/                  # ScriptableObjects (HeroDataSO), Enums (HeroRole, TurnPhase)
-├── Application/           # TurnManager, Timers, Comandos de Acción (Move, Shoot, Ability)
-└── Presentation/          # Entidades en escena (Character, Hero, Enemy, Boss, Minion) y UI
+├── Data/                  # Datos, modelos puros y ScriptableObjects sin lógica de motor
+│   ├── Enums/             # HeroRole, TurnPhase
+│   ├── Models/            # CharacterStats, MatchSettings
+│   └── ScriptableObjects/ # HeroDataSO, WeaponDataSO, TerrainMaterialSO
+│
+├── Rules/                 # Lógica de partida, controladores, acciones y presentadores
+│   ├── Abilities/         # Ability, HealAbility, ShieldAbility, TeleportAbility
+│   ├── Actions/           # ActionMove, ActionShoot, ActionAbility
+│   ├── Controllers/       # MainMenuController
+│   ├── Interfaces/        # ITimer, ICountdownTimer, ICharacterAction, IDamageable, IGravityAffected, IPlayerHUDView
+│   ├── Presenters/        # PlayerHUDPresenter
+│   └── TurnManager.cs, CountdownTimer.cs, StopwatchTimer.cs
+│
+├── Visual/                # Componentes MonoBehaviours dependientes de Unity (Entidades, Físicas, UI)
+│   ├── Entities/          # Character, Hero, Enemy, Boss, Minion
+│   ├── Environment/       # DestructibleCover
+│   ├── Physics/           # GravityBody, Projectile, KillZoneView
+│   └── UI/                # PlayerHUDView
+│
+└── Core/                  # IoCContainer (Inversión de Control) y GameManager
 ```
 
 ---
