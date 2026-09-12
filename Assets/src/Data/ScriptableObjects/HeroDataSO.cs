@@ -15,8 +15,9 @@ namespace CosmosCritters
         [SerializeField] private float _moveSpeed = 5f;
         [SerializeField] private float _jumpForce = 7f;
 
-        [Header("Role")]
+        [Header("Role & Loadout")]
         [SerializeField] private HeroRole _role = HeroRole.HeavyDamage;
+        [SerializeField] private WeaponDataSO _defaultWeapon;
 
         public string HeroName => _heroName;
         public Sprite Portrait => _portrait;
@@ -25,5 +26,6 @@ namespace CosmosCritters
         public float MoveSpeed => _moveSpeed;
         public float JumpForce => _jumpForce;
         public HeroRole Role => _role;
+        public WeaponDataSO DefaultWeapon => _defaultWeapon;
     }
 }

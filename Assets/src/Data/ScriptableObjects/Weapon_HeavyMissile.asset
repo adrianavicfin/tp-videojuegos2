@@ -1,0 +1,22 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2673149f170416a46af6ea2e88dab03b, type: 3}
+  m_Name: Weapon_HeavyMissile
+  m_EditorClassIdentifier: 
+  _weaponName: Misil Pesado
+  _description: Ojiva bal\xEDstica pesada de alto impacto con gran onda expansiva y descomunal knockback.
+  _weaponIcon: {fileID: 0}
+  _baseDamage: 60
+  _explosionRadius: 4
+  _knockbackForce: 30
+  _maxPower: 20
+  _projectilePrefab: {fileID: 7764529256259904585, guid: 71b3e510842a4253a6f1947b1c411a02, type: 3}

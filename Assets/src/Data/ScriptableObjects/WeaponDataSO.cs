@@ -10,6 +10,7 @@ namespace CosmosCritters
     {
         [Header("Identity")]
         [SerializeField] private string _weaponName = "Lanzador de Plasma";
+        [SerializeField, TextArea(2, 4)] private string _description = "Arma estándar de energía de plasma con daño balanceado.";
         [SerializeField] private Sprite _weaponIcon;
 
         [Header("Combat Stats")]
@@ -22,6 +23,7 @@ namespace CosmosCritters
         [SerializeField] private GameObject _projectilePrefab;
 
         public string WeaponName => _weaponName;
+        public string Description => _description;
         public Sprite WeaponIcon => _weaponIcon;
         public int BaseDamage => _baseDamage;
         public float ExplosionRadius => _explosionRadius;
