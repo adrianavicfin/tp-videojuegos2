@@ -21,13 +21,14 @@ namespace CosmosCritters
 
         protected override void Awake()
         {
+            base.Awake();
+
             if (_heroData != null)
             {
                 Initialize(_heroData, SlotIndex);
             }
             else
             {
-                base.Awake();
                 AssignDefaultSecondaryAbility();
             }
         }

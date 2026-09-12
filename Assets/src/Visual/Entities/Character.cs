@@ -17,6 +17,8 @@ namespace CosmosCritters
         [SerializeField] protected string _characterName = "Entity";
         [SerializeField] protected SpriteRenderer _spriteRenderer;
 
+        public SpriteRenderer SpriteRenderer => _spriteRenderer;
+
         [Header("Stats (Initial Config)")]
         [SerializeField] protected int _maxHealth = 100;
         [SerializeField] protected float _moveSpeed = 5f;

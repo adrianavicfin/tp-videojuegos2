@@ -26,14 +26,17 @@ namespace CosmosCritters
         {
             base.TakeDamage(amount);
 
-            float healthPercentage = (float)_currentHealth / _maxHealth;
-            if (healthPercentage <= 0.5f && _currentPhase == 1)
+            if (MaxHealth > 0)
             {
-                AdvancePhase(2);
-            }
-            else if (healthPercentage <= 0.2f && _currentPhase == 2)
-            {
-                AdvancePhase(3);
+                float healthPercentage = (float)CurrentHealth / MaxHealth;
+                if (healthPercentage <= 0.5f && _currentPhase == 1)
+                {
+                    AdvancePhase(2);
+                }
+                else if (healthPercentage <= 0.2f && _currentPhase == 2)
+                {
+                    AdvancePhase(3);
+                }
             }
         }
 

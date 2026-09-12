@@ -43,3 +43,5 @@ Thumbs.db
 
 # Custom excludes
 *.ps1
+Assets/TextMesh Pro/*
+Assets/TextMesh Pro.meta

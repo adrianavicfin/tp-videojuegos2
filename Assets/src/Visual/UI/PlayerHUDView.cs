@@ -47,9 +47,16 @@ namespace CosmosCritters
 
         public void SetPortrait(Sprite portrait)
         {
+            SetPortrait(portrait, Color.white);
+        }
+
+        public void SetPortrait(Sprite portrait, Color color)
+        {
             if (_portraitImage != null && portrait != null)
             {
                 _portraitImage.sprite = portrait;
+                _portraitImage.color = color;
+                _portraitImage.preserveAspect = true;
             }
         }
 

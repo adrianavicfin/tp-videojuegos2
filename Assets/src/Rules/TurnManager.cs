@@ -98,16 +98,22 @@ namespace CosmosCritters
                 MatchSettings settings = GameManager.Instance.CurrentMatchSettings;
                 _turnDuration = settings.TurnDuration;
 
-                // Configurar los slots de héroes con los ScriptableObjects seleccionados en el Menú
-                if (settings.SelectedHeroes != null && settings.SelectedHeroes.Count > 0)
+                int selectedCount = settings.SelectedHeroes != null ? settings.SelectedHeroes.Count : 0;
+
+                for (int i = 0; i < _heroSlots.Count; i++)
                 {
-                    for (int i = 0; i < _heroSlots.Count; i++)
+                    if (_heroSlots[i] == null) continue;
+
+                    if (i < selectedCount)
                     {
-                        if (i < settings.SelectedHeroes.Count && _heroSlots[i] != null)
-                        {
-                            _heroSlots[i].gameObject.SetActive(true);
-                            _heroSlots[i].Initialize(settings.SelectedHeroes[i], i + 1);
-                        }
+                        // Slot seleccionado: activar e inicializar con los datos del menú
+                        _heroSlots[i].gameObject.SetActive(true);
+                        _heroSlots[i].Initialize(settings.SelectedHeroes[i], i + 1);
+                    }
+                    else
+                    {
+                        // Slot no seleccionado: desactivar para que no participe ni aparezca en la escena
+                        _heroSlots[i].gameObject.SetActive(false);
                     }
                 }
             }
