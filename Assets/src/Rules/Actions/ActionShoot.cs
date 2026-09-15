@@ -12,14 +12,18 @@ namespace CosmosCritters
         public float Angle { get; private set; }
         public float Power { get; private set; }
         public int Damage { get; private set; }
+        public float ExplosionRadius { get; private set; }
+        public float KnockbackForce { get; private set; }
         public GameObject ProjectilePrefab { get; private set; }
 
-        public ActionShoot(float angle, float power, int damage, GameObject projectilePrefab = null)
+        public ActionShoot(float angle, float power, int damage, GameObject projectilePrefab = null, float explosionRadius = 2.5f, float knockbackForce = 15f)
         {
             Angle = angle;
             Power = Mathf.Clamp(power, 1f, 100f);
             Damage = Mathf.Max(1, damage);
             ProjectilePrefab = projectilePrefab;
+            ExplosionRadius = explosionRadius > 0f ? explosionRadius : 2.5f;
+            KnockbackForce = knockbackForce > 0f ? knockbackForce : 15f;
         }
 
         public bool CanExecute(Character user)
@@ -35,7 +39,7 @@ namespace CosmosCritters
             float rad = Angle * Mathf.Deg2Rad;
             Vector2 launchDirection = new Vector2(Mathf.Cos(rad), Mathf.Sin(rad));
 
-            Debug.Log($"[ActionShoot] {user.CharacterName} dispara hacia {launchDirection} con Potencia: {Power}, Daño: {Damage}");
+            Debug.Log($"[ActionShoot] {user.CharacterName} dispara hacia {launchDirection} con Potencia: {Power}, Daño: {Damage}, Radio: {ExplosionRadius}, Knockback: {KnockbackForce}");
 
             // Notificar al TurnManager que hay una acción ejecutándose en la escena (inputs bloqueados)
             if (TurnManager.Instance != null)
@@ -51,7 +55,13 @@ namespace CosmosCritters
 
                 if (projObj.TryGetComponent<Projectile>(out var projectile))
                 {
-                    projectile.Launch(launchDirection, Power, user, Damage);
+                    projectile.Launch(launchDirection, Power, user, Damage, ExplosionRadius, KnockbackForce);
+                }
+                else
+                {
+                    Debug.LogWarning("[ActionShoot] El prefab instanciado no contiene el componente Projectile. Abortando acción de forma segura.");
+                    Object.Destroy(projObj);
+                    TurnManager.Instance?.NotifyActionResolved();
                 }
             }
             else

@@ -81,7 +81,8 @@ namespace CosmosCritters
             for (int i = 0; i < hitCount; i++)
             {
                 Collider2D col = _explosionHits[i];
-                if (col == null || col.gameObject == gameObject) continue;
+                // Excluir el proyectil mismo y al dueño que disparó para evitar autodestrucción/auto-knockback
+                if (col == null || col.gameObject == gameObject || (_owner != null && col.gameObject == _owner.gameObject)) continue;
 
                 Vector2 direction = ((Vector2)col.transform.position - (Vector2)transform.position).normalized;
                 if (direction == Vector2.zero) direction = Vector2.up;

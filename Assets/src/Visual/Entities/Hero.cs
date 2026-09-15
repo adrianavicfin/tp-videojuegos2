@@ -10,8 +10,10 @@ namespace CosmosCritters
     {
         [Header("Hero Configuration")]
         [SerializeField] private HeroDataSO _heroData;
+        [SerializeField] private WeaponDataSO _equippedWeapon;
 
         public HeroDataSO HeroData => _heroData;
+        public WeaponDataSO EquippedWeapon => _equippedWeapon;
         public int SlotIndex { get; private set; } = 1;
 
         /// <summary>
@@ -45,6 +47,11 @@ namespace CosmosCritters
                 _moveSpeed = _heroData.MoveSpeed;
                 _jumpForce = _heroData.JumpForce;
 
+                if (_heroData.DefaultWeapon != null)
+                {
+                    _equippedWeapon = _heroData.DefaultWeapon;
+                }
+
                 UnbindStatsEvents();
                 Stats = new CharacterStats(_heroData.HeroName, _heroData.MaxHealth, _heroData.MoveSpeed, _heroData.JumpForce);
                 BindStatsEvents();
@@ -56,6 +63,13 @@ namespace CosmosCritters
 
                 AssignSecondaryAbilityByRole(_heroData.Role);
             }
+        }
+
+        public void EquipWeapon(WeaponDataSO weapon)
+        {
+            if (weapon == null) return;
+            _equippedWeapon = weapon;
+            Debug.Log($"[Hero] {_characterName} equipó el arma: {weapon.WeaponName}");
         }
 
         private void AssignDefaultSecondaryAbility()
@@ -116,9 +130,28 @@ namespace CosmosCritters
             ExecuteAction(new ActionMove(direction, distance));
         }
 
-        public void ExecuteShoot(float angle, float power, int damage, Character target)
+        public void ExecuteShoot(float angle, float power, int damage, Character target = null)
         {
-            ExecuteAction(new ActionShoot(angle, power, damage), target);
+            GameObject prefab = _equippedWeapon != null ? _equippedWeapon.ProjectilePrefab : null;
+            float radius = _equippedWeapon != null ? _equippedWeapon.ExplosionRadius : 2.5f;
+            float knockback = _equippedWeapon != null ? _equippedWeapon.KnockbackForce : 15f;
+            int finalDamage = _equippedWeapon != null ? _equippedWeapon.BaseDamage : damage;
+
+            ExecuteAction(new ActionShoot(angle, power, finalDamage, prefab, radius, knockback), target);
+        }
+
+        public void ExecuteShoot(Vector2 direction, float power)
+        {
+            float angle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
+            float maxPower = _equippedWeapon != null ? _equippedWeapon.MaxPower : 25f;
+            float clampedPower = Mathf.Clamp(power, 1f, maxPower);
+
+            GameObject prefab = _equippedWeapon != null ? _equippedWeapon.ProjectilePrefab : null;
+            float radius = _equippedWeapon != null ? _equippedWeapon.ExplosionRadius : 2.5f;
+            float knockback = _equippedWeapon != null ? _equippedWeapon.KnockbackForce : 15f;
+            int damage = _equippedWeapon != null ? _equippedWeapon.BaseDamage : 35;
+
+            ExecuteAction(new ActionShoot(angle, clampedPower, damage, prefab, radius, knockback), null);
         }
 
         public void ExecuteSecondaryAbility(Character target = null)
