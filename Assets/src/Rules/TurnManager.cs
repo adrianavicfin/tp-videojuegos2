@@ -51,10 +51,22 @@ namespace CosmosCritters
             {
                 GameManager.Instance.Container.Inject(this);
             }
+
+            // Fallback en caso de abrir GameplayScene directamente en el editor sin pasar por MainMenu
+            if (_turnTimer == null)
+            {
+                _turnTimer = new CountdownTimer();
+                _turnTimer.OnFinished += HandleTurnTimerFinished;
+            }
         }
 
         public void Construct(ICountdownTimer turnTimer)
         {
+            if (_turnTimer != null)
+            {
+                _turnTimer.OnFinished -= HandleTurnTimerFinished;
+            }
+
             _turnTimer = turnTimer;
 
             if (_turnTimer != null)
@@ -138,6 +150,16 @@ namespace CosmosCritters
         {
             _turnQueue.Clear();
 
+            if (_heroSlots == null || _heroSlots.Count == 0)
+            {
+                _heroSlots = new List<Hero>(FindObjectsOfType<Hero>());
+            }
+
+            if (_boss == null)
+            {
+                _boss = FindObjectOfType<Boss>();
+            }
+
             for (int i = 0; i < _heroSlots.Count; i++)
             {
                 if (_heroSlots[i] != null && !_heroSlots[i].IsDead && _heroSlots[i].gameObject.activeSelf)
@@ -146,7 +168,7 @@ namespace CosmosCritters
                 }
             }
 
-            if (_boss != null && !_boss.IsDead)
+            if (_boss != null && !_boss.IsDead && _boss.gameObject.activeSelf)
             {
                 _turnQueue.Enqueue(_boss);
             }
