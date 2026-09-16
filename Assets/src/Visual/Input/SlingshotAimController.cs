@@ -43,8 +43,11 @@ namespace CosmosCritters
         [Tooltip("Distancia mínima de arrastre para considerar un tiro válido (evita micro-clics accidentales).")]
         [SerializeField] private float _minDragThreshold = 0.35f;
 
-        [Tooltip("Distancia máxima de selección de clic alrededor del héroe para iniciar el tensado.")]
-        [SerializeField] private float _heroClickRadius = 1.5f;
+        [Tooltip("Si es true, permite iniciar el arrastre haciendo clic en cualquier parte de la pantalla mientras sea el turno del héroe.")]
+        [SerializeField] private bool _allowClickAnywhere = true;
+
+        [Tooltip("Distancia máxima de selección de clic alrededor del héroe para iniciar el tensado si _allowClickAnywhere es false.")]
+        [SerializeField] private float _heroClickRadius = 3.5f;
 
         [Tooltip("Potencia máxima por defecto si el héroe no tiene arma equipada.")]
         [SerializeField] private float _defaultMaxPower = 25f;
@@ -84,6 +87,35 @@ namespace CosmosCritters
             }
         }
 
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+        private static void EnsureInstanceInScene()
+        {
+            if (Instance == null && UnityEngine.Object.FindObjectOfType<SlingshotAimController>() == null)
+            {
+                if (UnityEngine.Object.FindObjectOfType<TurnManager>() != null || UnityEngine.Object.FindObjectOfType<Hero>() != null)
+                {
+                    GameObject go = new GameObject("SlingshotAimSystem");
+                    go.AddComponent<SlingshotAimController>();
+                    go.AddComponent<TrajectoryPredictor>();
+                    Debug.Log("[Slingshot] AimSystem auto-creado y configurado en la escena de Gameplay.");
+                }
+            }
+        }
+
+        private Vector2 GetMouseWorldPosition()
+        {
+            if (_mainCamera == null)
+            {
+                _mainCamera = Camera.main;
+                if (_mainCamera == null) return Vector2.zero;
+            }
+
+            Vector3 mouseScreen = Input.mousePosition;
+            mouseScreen.z = Mathf.Abs(_mainCamera.transform.position.z);
+            Vector3 worldPos3D = _mainCamera.ScreenToWorldPoint(mouseScreen);
+            return new Vector2(worldPos3D.x, worldPos3D.y);
+        }
+
         private void Update()
         {
             if (!CanAim())
@@ -103,7 +135,16 @@ namespace CosmosCritters
         /// </summary>
         private bool CanAim()
         {
-            if (TurnManager.Instance == null) return false;
+            if (TurnManager.Instance == null)
+            {
+                // Fallback directo por si se prueba sin TurnManager
+                if (_currentActiveHero == null)
+                {
+                    _currentActiveHero = UnityEngine.Object.FindObjectOfType<Hero>();
+                }
+                return _currentActiveHero != null && !_currentActiveHero.IsDead;
+            }
+
             if (TurnManager.Instance.CurrentPhase != TurnPhase.WaitingInput) return false;
 
             Character activeChar = TurnManager.Instance.ActiveCharacter;
@@ -120,13 +161,7 @@ namespace CosmosCritters
 
         private void HandleAimInput()
         {
-            if (_mainCamera == null)
-            {
-                _mainCamera = Camera.main;
-                if (_mainCamera == null) return;
-            }
-
-            Vector2 mouseWorldPos = _mainCamera.ScreenToWorldPoint(Input.mousePosition);
+            Vector2 mouseWorldPos = GetMouseWorldPosition();
 
             // 1. Iniciar Apuntado (Clic Izquierdo presionado)
             if (Input.GetMouseButtonDown(0))
@@ -136,9 +171,14 @@ namespace CosmosCritters
                     Vector2 heroPos = _currentActiveHero.transform.position;
                     float distToHero = Vector2.Distance(mouseWorldPos, heroPos);
 
-                    if (distToHero <= _heroClickRadius)
+                    if (_allowClickAnywhere || distToHero <= _heroClickRadius)
                     {
+                        Debug.Log($"[Slingshot] ¡Apuntado iniciado para {_currentActiveHero.CharacterName}! HeroPos: {heroPos}, MousePos: {mouseWorldPos}");
                         StartAim(heroPos);
+                    }
+                    else
+                    {
+                        Debug.Log($"[Slingshot] Clic fuera de rango. Distancia al héroe: {distToHero:F2} > Radio ({_heroClickRadius:F2})");
                     }
                 }
             }
@@ -211,6 +251,12 @@ namespace CosmosCritters
 
             Debug.Log($"[Slingshot] ¡Disparo ejecutado! Dirección: {_currentLaunchDirection}, Potencia: {_currentPower:F1}/{_maxAllowedPower:F1}");
             OnAimReleased?.Invoke(_currentLaunchDirection, _currentPower);
+
+            // Ejecutar el disparo mediante el Héroe activo (Patrón Command ActionShoot)
+            if (_currentActiveHero != null && !_currentActiveHero.IsDead)
+            {
+                _currentActiveHero.ExecuteShoot(_currentLaunchDirection, _currentPower);
+            }
         }
 
         public void CancelAim()

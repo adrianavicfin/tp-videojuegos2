@@ -14,10 +14,12 @@ namespace CosmosCritters
         [SerializeField] private float _explosionRadius = 2.5f;
         [SerializeField] private float _knockbackForce = 15f;
         [SerializeField] private GameObject _explosionVfxPrefab;
+        [SerializeField] private float _maxLifetime = 10f;
 
         private Rigidbody2D _rb;
         private Character _owner;
         private bool _hasExploded = false;
+        private float _aliveTimer = 0f;
 
         // Buffer pre-alocado para detección de explosión Zero-Alloc
         private readonly Collider2D[] _explosionHits = new Collider2D[20];
@@ -47,6 +49,18 @@ namespace CosmosCritters
         private void Awake()
         {
             _rb = GetComponent<Rigidbody2D>();
+        }
+
+        private void Update()
+        {
+            if (_hasExploded) return;
+
+            _aliveTimer += Time.deltaTime;
+            if (_aliveTimer >= _maxLifetime)
+            {
+                Debug.LogWarning($"[Projectile] Tiempo de vida límite ({_maxLifetime}s) alcanzado. Detonando por seguridad.");
+                Explode();
+            }
         }
 
         public void Launch(Vector2 direction, float power, Character owner, int damage = 35, float explosionRadius = 2.5f, float knockbackForce = 15f)
