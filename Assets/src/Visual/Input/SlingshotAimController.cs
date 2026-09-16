@@ -211,6 +211,12 @@ namespace CosmosCritters
 
             Debug.Log($"[Slingshot] ¡Disparo ejecutado! Dirección: {_currentLaunchDirection}, Potencia: {_currentPower:F1}/{_maxAllowedPower:F1}");
             OnAimReleased?.Invoke(_currentLaunchDirection, _currentPower);
+
+            // Ejecutar el disparo mediante el Héroe activo (Patrón Command ActionShoot)
+            if (_currentActiveHero != null && !_currentActiveHero.IsDead)
+            {
+                _currentActiveHero.ExecuteShoot(_currentLaunchDirection, _currentPower);
+            }
         }
 
         public void CancelAim()
