@@ -25,12 +25,15 @@ namespace CosmosCritters
 
         private Character _character;
         private Rigidbody2D _rb;
+        private Collider2D _ownCollider;
         private SpriteRenderer _spriteRenderer;
 
         private float _horizontalInput = 0f;
         private bool _isGrounded = true;
         private Vector2 _surfaceNormal = Vector2.up;
         private Vector2 _surfaceTangent = Vector2.right;
+
+        private readonly RaycastHit2D[] _groundHits = new RaycastHit2D[8];
 
         public bool IsGrounded => _isGrounded;
         public Vector2 SurfaceNormal => _surfaceNormal;
@@ -40,7 +43,13 @@ namespace CosmosCritters
         {
             _character = GetComponent<Character>();
             _rb = GetComponent<Rigidbody2D>();
+            _ownCollider = GetComponent<Collider2D>();
             _spriteRenderer = GetComponentInChildren<SpriteRenderer>();
+
+            if (_rb != null)
+            {
+                _rb.freezeRotation = true;
+            }
 
             if (_character != null && _character.MoveSpeed > 0f)
             {
@@ -119,19 +128,29 @@ namespace CosmosCritters
         }
 
         /// <summary>
-        /// Detección física de contacto con la superficie planetaria.
+        /// Detección física de contacto con la superficie planetaria (Zero-Alloc, ignora colisionadores propios).
         /// </summary>
         private void CheckGrounded()
         {
-            // Raycast desde el centro del personaje hacia sus pies (dirección hacia el planeta)
             Vector2 feetDirection = -_surfaceNormal;
-            RaycastHit2D hit = Physics2D.Raycast(transform.position, feetDirection, _groundCheckDistance, _groundLayers);
+            int count = Physics2D.RaycastNonAlloc(transform.position, feetDirection, _groundHits, _groundCheckDistance, _groundLayers);
 
-            _isGrounded = hit.collider != null && hit.collider.gameObject != gameObject && !hit.collider.isTrigger;
+            _isGrounded = false;
+            for (int i = 0; i < count; i++)
+            {
+                Collider2D col = _groundHits[i].collider;
+                if (col == null || col == _ownCollider || col.isTrigger || col.gameObject == gameObject)
+                {
+                    continue;
+                }
+
+                _isGrounded = true;
+                break;
+            }
         }
 
         /// <summary>
-        /// Aplica la fuerza tangencial en la superficie curva del planeta.
+        /// Aplica la fuerza/velocidad tangencial en la superficie curva del planeta.
         /// </summary>
         private void ApplyTangentLocomotion()
         {
@@ -140,35 +159,36 @@ namespace CosmosCritters
             float speed = _character != null ? _character.MoveSpeed : _moveSpeed;
             float targetTangentSpeed = _horizontalInput * speed;
 
-            if (!_isGrounded)
-            {
-                targetTangentSpeed *= _airControlMultiplier;
-            }
-
             // Proyectar la velocidad actual sobre los ejes Normal y Tangente
             float currentTangentSpeed = Vector2.Dot(_rb.velocity, _surfaceTangent);
             float currentNormalSpeed = Vector2.Dot(_rb.velocity, _surfaceNormal);
 
-            if (_isGrounded && Mathf.Abs(_horizontalInput) > 0.05f)
+            if (_isGrounded)
             {
-                // Movimiento firme sobre la superficie
-                _rb.velocity = (_surfaceTangent * targetTangentSpeed) + (_surfaceNormal * currentNormalSpeed);
+                if (Mathf.Abs(_horizontalInput) > 0.05f)
+                {
+                    // Desplazamiento tangencial directo sobre la superficie
+                    _rb.velocity = (_surfaceTangent * targetTangentSpeed) + (_surfaceNormal * currentNormalSpeed);
+                }
+                else
+                {
+                    // Fricción y frenado suave en reposo
+                    float dampedTangentSpeed = Mathf.MoveTowards(currentTangentSpeed, 0f, 25f * Time.fixedDeltaTime);
+                    _rb.velocity = (_surfaceTangent * dampedTangentSpeed) + (_surfaceNormal * currentNormalSpeed);
+                }
             }
-            else if (_isGrounded && Mathf.Abs(_horizontalInput) <= 0.05f)
+            else
             {
-                // Fricción y frenado en reposo
-                float dampedTangentSpeed = Mathf.MoveTowards(currentTangentSpeed, 0f, 20f * Time.fixedDeltaTime);
-                _rb.velocity = (_surfaceTangent * dampedTangentSpeed) + (_surfaceNormal * currentNormalSpeed);
-            }
-            else if (!_isGrounded && Mathf.Abs(_horizontalInput) > 0.05f)
-            {
-                // Leve impulso en el aire
-                _rb.AddForce(_surfaceTangent * (_horizontalInput * speed * 5f * _airControlMultiplier), ForceMode2D.Force);
+                if (Mathf.Abs(_horizontalInput) > 0.05f)
+                {
+                    // Control aéreo leve
+                    _rb.AddForce(_surfaceTangent * (_horizontalInput * speed * 10f * _airControlMultiplier), ForceMode2D.Force);
+                }
             }
         }
 
         /// <summary>
-        /// Rota al personaje suavemente para que sus pies siempre apunten al centro del planeta.
+        /// Rota al personaje perpendicularmente a la superficie planetaria.
         /// </summary>
         private void AlignRotationWithSurface()
         {
@@ -179,8 +199,7 @@ namespace CosmosCritters
             else if (_rb != null)
             {
                 float targetAngle = Mathf.Atan2(_surfaceNormal.y, _surfaceNormal.x) * Mathf.Rad2Deg - 90f;
-                float currentAngle = Mathf.LerpAngle(_rb.rotation, targetAngle, 12f * Time.fixedDeltaTime);
-                _rb.MoveRotation(currentAngle);
+                _rb.rotation = targetAngle;
             }
         }
 
