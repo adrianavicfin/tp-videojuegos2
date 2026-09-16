@@ -21,9 +21,49 @@ namespace CosmosCritters
         // Buffer pre-alocado para evitar Garbage Collection en FixedUpdate (Zero-Alloc)
         private readonly Collider2D[] _overlapResults = new Collider2D[32];
 
+        // Registro estático de planetas activos para predicción balística Zero-Alloc
+        private static readonly System.Collections.Generic.List<GravityBody> _allBodies = new System.Collections.Generic.List<GravityBody>();
+        public static System.Collections.Generic.IReadOnlyList<GravityBody> AllBodies => _allBodies;
+
         public float GravityRadius => _gravityRadius;
         public float GravityForce => _gravityForce;
         public Vector2 Position => transform.position;
+
+        private void OnEnable()
+        {
+            if (!_allBodies.Contains(this))
+            {
+                _allBodies.Add(this);
+            }
+        }
+
+        private void OnDisable()
+        {
+            _allBodies.Remove(this);
+        }
+
+        /// <summary>
+        /// Calcula la fuerza gravitatoria total resultante acumulada en un punto del espacio.
+        /// Utilizado por el TrajectoryPredictor para simulación numérica sin costo de búsqueda de objetos.
+        /// </summary>
+        public static Vector2 GetTotalGravitationalPull(Vector2 point)
+        {
+            Vector2 totalForce = Vector2.zero;
+            for (int i = 0; i < _allBodies.Count; i++)
+            {
+                var body = _allBodies[i];
+                if (body == null || !body.isActiveAndEnabled) continue;
+
+                Vector2 directionToPlanet = body.Position - point;
+                float distance = directionToPlanet.magnitude;
+
+                if (distance <= body._gravityRadius && distance > 0.01f)
+                {
+                    totalForce += directionToPlanet.normalized * body._gravityForce;
+                }
+            }
+            return totalForce;
+        }
 
         private void FixedUpdate()
         {
