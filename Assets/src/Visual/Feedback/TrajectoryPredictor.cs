@@ -278,10 +278,10 @@ namespace CosmosCritters
             }
         }
 
-        private void HandleJumpAimUpdated(Vector2 origin, Vector2 direction, float force, int level)
+        private void HandleJumpAimUpdated(Vector2 origin, Vector2 direction, float force, int level, float gravityMultiplier)
         {
             SetTrajectoryColor(Color.white);
-            PredictTrajectory(origin, direction, force);
+            PredictTrajectory(origin, direction, force, gravityMultiplier);
         }
 
         private void HandleJumpAimExecuted(Vector2 direction, float force)
@@ -298,7 +298,7 @@ namespace CosmosCritters
         /// <summary>
         /// Simulación numérica física paso a paso considerando campos gravitatorios radiales (Euler Integration).
         /// </summary>
-        public void PredictTrajectory(Vector2 startPos, Vector2 direction, float launchPower)
+        public void PredictTrajectory(Vector2 startPos, Vector2 direction, float launchPower, float gravityMultiplier = 1.0f)
         {
             float power = Mathf.Max(launchPower, 1.0f);
             Vector2 currentPos = startPos + (direction.normalized * 1.0f);
@@ -309,8 +309,8 @@ namespace CosmosCritters
 
             for (int i = 1; i < _maxSimulationSteps; i++)
             {
-                // 1. Calcular gravedad acumulada en el punto actual
-                Vector2 gravityForce = GravityBody.GetTotalGravitationalPull(currentPos);
+                // 1. Calcular gravedad acumulada en el punto actual escalada por el multiplicador
+                Vector2 gravityForce = GravityBody.GetTotalGravitationalPull(currentPos) * gravityMultiplier;
                 Vector2 acceleration = gravityForce / _simulatedMass;
 
                 // 2. Integración de velocidad y posición

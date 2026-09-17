@@ -23,6 +23,8 @@ namespace CosmosCritters
         [SerializeField] protected int _maxHealth = 100;
         [SerializeField] protected float _moveSpeed = 5f;
         [SerializeField] protected float _jumpForce = 7f;
+        [Tooltip("Multiplicador porcentual de gravedad (1.0 = normal, 0.5 = baja gravedad, 2.0 = alta gravedad).")]
+        [SerializeField] protected float _gravityMultiplier = 1.0f;
 
         protected Rigidbody2D _rb;
 
@@ -42,6 +44,7 @@ namespace CosmosCritters
         public int MaxHealth => Stats != null ? Stats.MaxHealth : _maxHealth;
         public float MoveSpeed => Stats != null ? Stats.MoveSpeed : _moveSpeed;
         public float JumpForce => Stats != null ? Stats.JumpForce : _jumpForce;
+        public float GravityMultiplier => Stats != null ? Stats.GravityMultiplier : _gravityMultiplier;
         public bool IsDead => Stats != null && Stats.IsDead;
         #endregion
 
@@ -59,7 +62,7 @@ namespace CosmosCritters
 
             if (Stats == null)
             {
-                Stats = new CharacterStats(_characterName, _maxHealth, _moveSpeed, _jumpForce);
+                Stats = new CharacterStats(_characterName, _maxHealth, _moveSpeed, _jumpForce, _gravityMultiplier);
                 BindStatsEvents();
             }
         }
@@ -67,6 +70,17 @@ namespace CosmosCritters
         protected virtual void OnDestroy()
         {
             UnbindStatsEvents();
+        }
+        #endregion
+
+        #region Modifiers
+        /// <summary>
+        /// Modifica dinámicamente el multiplicador de gravedad del personaje (ej. efectos gravitatorios, buffs/debuffs).
+        /// </summary>
+        public virtual void SetGravityMultiplier(float multiplier)
+        {
+            _gravityMultiplier = Mathf.Max(0f, multiplier);
+            Stats?.SetGravityMultiplier(multiplier);
         }
         #endregion
 
@@ -94,7 +108,7 @@ namespace CosmosCritters
         {
             if (_rb != null && !_rb.isKinematic)
             {
-                _rb.AddForce(force, ForceMode2D.Force);
+                _rb.AddForce(force * GravityMultiplier, ForceMode2D.Force);
             }
         }
 

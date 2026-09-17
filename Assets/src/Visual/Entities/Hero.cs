@@ -51,6 +51,7 @@ namespace CosmosCritters
                 _maxHealth = _heroData.MaxHealth;
                 _moveSpeed = _heroData.MoveSpeed;
                 _jumpForce = _heroData.JumpForce;
+                _gravityMultiplier = _heroData.GravityMultiplier;
 
                 if (_heroData.DefaultWeapon != null)
                 {
@@ -58,7 +59,7 @@ namespace CosmosCritters
                 }
 
                 UnbindStatsEvents();
-                Stats = new CharacterStats(_heroData.HeroName, _heroData.MaxHealth, _heroData.MoveSpeed, _heroData.JumpForce);
+                Stats = new CharacterStats(_heroData.HeroName, _heroData.MaxHealth, _heroData.MoveSpeed, _heroData.JumpForce, _heroData.GravityMultiplier);
                 BindStatsEvents();
 
                 if (_spriteRenderer != null && _heroData.CharacterSprite != null)

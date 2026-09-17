@@ -21,9 +21,9 @@ namespace CosmosCritters
 
         /// <summary>
         /// Se dispara continuamente mientras se apunta el salto.
-        /// Parámetros: (Vector2 origin, Vector2 direction, float force, int level)
+        /// Parámetros: (Vector2 origin, Vector2 direction, float force, int level, float gravityMultiplier)
         /// </summary>
-        public event Action<Vector2, Vector2, float, int> OnJumpAimUpdated;
+        public event Action<Vector2, Vector2, float, int, float> OnJumpAimUpdated;
 
         /// <summary>
         /// Se dispara al confirmar y ejecutar el salto.
@@ -206,9 +206,10 @@ namespace CosmosCritters
             }
 
             float baseJumpForce = _currentActiveHero != null ? _currentActiveHero.JumpForce : 7f;
+            float gravityMultiplier = _currentActiveHero != null ? _currentActiveHero.GravityMultiplier : 1.0f;
             float finalForce = baseJumpForce * _jumpForceMultiplier * PowerPercentage;
 
-            OnJumpAimUpdated?.Invoke(heroPos, _currentDirection, finalForce, _currentPowerLevel);
+            OnJumpAimUpdated?.Invoke(heroPos, _currentDirection, finalForce, _currentPowerLevel, gravityMultiplier);
         }
 
         private void StartJumpAim()

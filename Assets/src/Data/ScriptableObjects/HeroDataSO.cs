@@ -14,6 +14,8 @@ namespace CosmosCritters
         [SerializeField] private int _maxHealth = 100;
         [SerializeField] private float _moveSpeed = 5f;
         [SerializeField] private float _jumpForce = 7f;
+        [Tooltip("Multiplicador porcentual de gravedad (1.0 = normal, 0.5 = baja gravedad, 2.0 = alta gravedad).")]
+        [SerializeField] private float _gravityMultiplier = 1.0f;
 
         [Header("Role & Loadout")]
         [SerializeField] private HeroRole _role = HeroRole.HeavyDamage;
@@ -25,6 +27,7 @@ namespace CosmosCritters
         public int MaxHealth => _maxHealth;
         public float MoveSpeed => _moveSpeed;
         public float JumpForce => _jumpForce;
+        public float GravityMultiplier => _gravityMultiplier;
         public HeroRole Role => _role;
         public WeaponDataSO DefaultWeapon => _defaultWeapon;
     }
