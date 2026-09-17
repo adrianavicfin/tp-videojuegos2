@@ -65,20 +65,20 @@ namespace CosmosCritters
         private void Start()
         {
             ConfigureLineRenderer();
-            SubscribeToAimController();
+            SubscribeToAimControllers();
         }
 
         private void Update()
         {
-            if (!_isSubscribed && SlingshotAimController.Instance != null)
+            if (!_isSubscribed && (SlingshotAimController.Instance != null || JumpAimController.Instance != null))
             {
-                SubscribeToAimController();
+                SubscribeToAimControllers();
             }
         }
 
         private void OnDestroy()
         {
-            UnsubscribeFromAimController();
+            UnsubscribeFromAimControllers();
         }
 
         private void CreateDotPool()
@@ -160,41 +160,89 @@ namespace CosmosCritters
                 }
             }
 
-            Gradient gradient = new Gradient();
-            gradient.SetKeys(
-                new GradientColorKey[] { new GradientColorKey(_trajectoryColor, 0f), new GradientColorKey(_trajectoryColor, 1f) },
-                new GradientAlphaKey[] { new GradientAlphaKey(1f, 0f), new GradientAlphaKey(0.3f, 1f) }
-            );
-            _lineRenderer.colorGradient = gradient;
+            SetTrajectoryColor(_trajectoryColor);
         }
 
-        private void SubscribeToAimController()
+        public void SetTrajectoryColor(Color color)
         {
-            if (SlingshotAimController.Instance != null && !_isSubscribed)
+            if (_lineRenderer != null)
             {
-                SlingshotAimController.Instance.OnAimStarted += HandleAimStarted;
-                SlingshotAimController.Instance.OnAimUpdated += HandleAimUpdated;
-                SlingshotAimController.Instance.OnAimReleased += HandleAimReleased;
-                SlingshotAimController.Instance.OnAimCanceled += HandleAimCanceled;
-                _isSubscribed = true;
+                Gradient gradient = new Gradient();
+                gradient.SetKeys(
+                    new GradientColorKey[] { new GradientColorKey(color, 0f), new GradientColorKey(color, 1f) },
+                    new GradientAlphaKey[] { new GradientAlphaKey(1f, 0f), new GradientAlphaKey(0.3f, 1f) }
+                );
+                _lineRenderer.colorGradient = gradient;
+            }
+
+            if (_dotRenderers != null)
+            {
+                for (int i = 0; i < _dotRenderers.Length; i++)
+                {
+                    if (_dotRenderers[i] != null)
+                    {
+                        _dotRenderers[i].color = color;
+                    }
+                }
             }
         }
 
-        private void UnsubscribeFromAimController()
+        private void SubscribeToAimControllers()
         {
-            if (SlingshotAimController.Instance != null && _isSubscribed)
+            if (SlingshotAimController.Instance != null)
             {
                 SlingshotAimController.Instance.OnAimStarted -= HandleAimStarted;
                 SlingshotAimController.Instance.OnAimUpdated -= HandleAimUpdated;
                 SlingshotAimController.Instance.OnAimReleased -= HandleAimReleased;
                 SlingshotAimController.Instance.OnAimCanceled -= HandleAimCanceled;
-                _isSubscribed = false;
+
+                SlingshotAimController.Instance.OnAimStarted += HandleAimStarted;
+                SlingshotAimController.Instance.OnAimUpdated += HandleAimUpdated;
+                SlingshotAimController.Instance.OnAimReleased += HandleAimReleased;
+                SlingshotAimController.Instance.OnAimCanceled += HandleAimCanceled;
             }
+
+            if (JumpAimController.Instance != null)
+            {
+                JumpAimController.Instance.OnJumpAimStarted -= HandleJumpAimStarted;
+                JumpAimController.Instance.OnJumpAimUpdated -= HandleJumpAimUpdated;
+                JumpAimController.Instance.OnJumpAimExecuted -= HandleJumpAimExecuted;
+                JumpAimController.Instance.OnJumpAimCanceled -= HandleJumpAimCanceled;
+
+                JumpAimController.Instance.OnJumpAimStarted += HandleJumpAimStarted;
+                JumpAimController.Instance.OnJumpAimUpdated += HandleJumpAimUpdated;
+                JumpAimController.Instance.OnJumpAimExecuted += HandleJumpAimExecuted;
+                JumpAimController.Instance.OnJumpAimCanceled += HandleJumpAimCanceled;
+            }
+
+            _isSubscribed = true;
         }
 
-        #region Event Handlers
+        private void UnsubscribeFromAimControllers()
+        {
+            if (SlingshotAimController.Instance != null)
+            {
+                SlingshotAimController.Instance.OnAimStarted -= HandleAimStarted;
+                SlingshotAimController.Instance.OnAimUpdated -= HandleAimUpdated;
+                SlingshotAimController.Instance.OnAimReleased -= HandleAimReleased;
+                SlingshotAimController.Instance.OnAimCanceled -= HandleAimCanceled;
+            }
+
+            if (JumpAimController.Instance != null)
+            {
+                JumpAimController.Instance.OnJumpAimStarted -= HandleJumpAimStarted;
+                JumpAimController.Instance.OnJumpAimUpdated -= HandleJumpAimUpdated;
+                JumpAimController.Instance.OnJumpAimExecuted -= HandleJumpAimExecuted;
+                JumpAimController.Instance.OnJumpAimCanceled -= HandleJumpAimCanceled;
+            }
+
+            _isSubscribed = false;
+        }
+
+        #region Slingshot Event Handlers
         private void HandleAimStarted(Vector2 origin)
         {
+            SetTrajectoryColor(_trajectoryColor);
             if (_lineRenderer != null)
             {
                 _lineRenderer.enabled = true;
@@ -204,6 +252,7 @@ namespace CosmosCritters
 
         private void HandleAimUpdated(Vector2 origin, Vector2 direction, float power, float normalizedPower)
         {
+            SetTrajectoryColor(_trajectoryColor);
             PredictTrajectory(origin, direction, power);
         }
 
@@ -218,13 +267,41 @@ namespace CosmosCritters
         }
         #endregion
 
+        #region Jump Aim Event Handlers
+        private void HandleJumpAimStarted(Vector2 origin)
+        {
+            SetTrajectoryColor(Color.white);
+            if (_lineRenderer != null)
+            {
+                _lineRenderer.enabled = true;
+                _lineRenderer.positionCount = 0;
+            }
+        }
+
+        private void HandleJumpAimUpdated(Vector2 origin, Vector2 direction, float force, int level)
+        {
+            SetTrajectoryColor(Color.white);
+            PredictTrajectory(origin, direction, force);
+        }
+
+        private void HandleJumpAimExecuted(Vector2 direction, float force)
+        {
+            HideTrajectory();
+        }
+
+        private void HandleJumpAimCanceled()
+        {
+            HideTrajectory();
+        }
+        #endregion
+
         /// <summary>
         /// Simulación numérica física paso a paso considerando campos gravitatorios radiales (Euler Integration).
         /// </summary>
         public void PredictTrajectory(Vector2 startPos, Vector2 direction, float launchPower)
         {
-            float power = Mathf.Max(launchPower, 3.0f);
-            Vector2 currentPos = startPos + (direction.normalized * 1.5f);
+            float power = Mathf.Max(launchPower, 1.0f);
+            Vector2 currentPos = startPos + (direction.normalized * 1.0f);
             Vector2 velocity = direction.normalized * power;
 
             int validPointCount = 0;
@@ -255,7 +332,6 @@ namespace CosmosCritters
                 }
 
                 _simulationPoints[validPointCount++] = new Vector3(nextPos.x, nextPos.y, 0f);
-                Debug.DrawLine(_simulationPoints[validPointCount - 2], _simulationPoints[validPointCount - 1], _trajectoryColor, 0.05f);
                 currentPos = nextPos;
             }
 

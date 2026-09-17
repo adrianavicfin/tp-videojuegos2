@@ -135,6 +135,12 @@ namespace CosmosCritters
         /// </summary>
         private bool CanAim()
         {
+            // Si se está apuntando el salto, no interferir con la resortera
+            if (JumpAimController.Instance != null && JumpAimController.Instance.IsAimingJump)
+            {
+                return false;
+            }
+
             if (TurnManager.Instance == null)
             {
                 // Fallback directo por si se prueba sin TurnManager

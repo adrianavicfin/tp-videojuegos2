@@ -135,6 +135,11 @@ namespace CosmosCritters
             ExecuteAction(new ActionMove(direction, distance));
         }
 
+        public void ExecuteJump(Vector2 direction, float force)
+        {
+            ExecuteAction(new ActionJump(direction, force));
+        }
+
         public void ExecuteShoot(float angle, float power, int damage, Character target = null)
         {
             GameObject prefab = _equippedWeapon != null ? _equippedWeapon.ProjectilePrefab : null;

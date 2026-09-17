@@ -90,8 +90,13 @@ namespace CosmosCritters
         {
             if (_character == null || _character.IsDead) return false;
 
-            // Si se está apuntando con la resortera, congelar la caminata para apuntar con precisión
+            // Si se está apuntando con la resortera o con el salto, congelar la caminata para apuntar con precisión
             if (SlingshotAimController.Instance != null && SlingshotAimController.Instance.IsAiming)
+            {
+                return false;
+            }
+
+            if (JumpAimController.Instance != null && JumpAimController.Instance.IsAimingJump)
             {
                 return false;
             }
