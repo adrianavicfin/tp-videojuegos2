@@ -25,6 +25,11 @@ namespace CosmosCritters
         {
             base.Awake();
 
+            if (GetComponent<CharacterMovementController>() == null)
+            {
+                gameObject.AddComponent<CharacterMovementController>();
+            }
+
             if (_heroData != null)
             {
                 Initialize(_heroData, SlotIndex);

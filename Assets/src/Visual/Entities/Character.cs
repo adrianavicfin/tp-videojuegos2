@@ -49,6 +49,11 @@ namespace CosmosCritters
         protected virtual void Awake()
         {
             _rb = GetComponent<Rigidbody2D>();
+            if (_rb != null)
+            {
+                _rb.freezeRotation = true;
+            }
+
             if (_spriteRenderer == null)
                 _spriteRenderer = GetComponentInChildren<SpriteRenderer>();
 
@@ -98,8 +103,7 @@ namespace CosmosCritters
             if (_rb == null || upDirection.sqrMagnitude < 0.001f) return;
 
             float targetAngle = Mathf.Atan2(upDirection.y, upDirection.x) * Mathf.Rad2Deg - 90f;
-            float currentAngle = Mathf.LerpAngle(_rb.rotation, targetAngle, 10f * Time.fixedDeltaTime);
-            _rb.MoveRotation(currentAngle);
+            _rb.rotation = targetAngle;
         }
         #endregion
 
