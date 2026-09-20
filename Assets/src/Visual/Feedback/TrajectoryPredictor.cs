@@ -9,7 +9,24 @@ namespace CosmosCritters
     [RequireComponent(typeof(LineRenderer))]
     public class TrajectoryPredictor : MonoBehaviour
     {
-        public static TrajectoryPredictor Instance { get; private set; }
+        private static TrajectoryPredictor _instance;
+        public static TrajectoryPredictor Instance
+        {
+            get
+            {
+                if (_instance == null)
+                {
+                    _instance = UnityEngine.Object.FindObjectOfType<TrajectoryPredictor>();
+                    if (_instance == null)
+                    {
+                        GameObject go = new GameObject("TrajectoryPredictorSystem");
+                        _instance = go.AddComponent<TrajectoryPredictor>();
+                    }
+                }
+                return _instance;
+            }
+            private set => _instance = value;
+        }
 
         [Header("Simulation Parameters")]
         [Tooltip("Cantidad máxima de pasos o muestras calculadas en la parábola.")]
@@ -41,12 +58,12 @@ namespace CosmosCritters
 
         private void Awake()
         {
-            if (Instance != null && Instance != this)
+            if (_instance != null && _instance != this)
             {
                 Destroy(this);
                 return;
             }
-            Instance = this;
+            _instance = this;
 
             transform.position = new Vector3(transform.position.x, transform.position.y, 0f);
 
