@@ -70,9 +70,13 @@ namespace CosmosCritters
 
         private void Update()
         {
-            if (!_isSubscribed && (SlingshotAimController.Instance != null || JumpAimController.Instance != null))
+            if (!_isSubscribedSlingshot && SlingshotAimController.Instance != null)
             {
-                SubscribeToAimControllers();
+                SubscribeToSlingshot();
+            }
+            if (!_isSubscribedJumpAim && JumpAimController.Instance != null)
+            {
+                SubscribeToJumpAim();
             }
         }
 
@@ -189,7 +193,13 @@ namespace CosmosCritters
 
         private void SubscribeToAimControllers()
         {
-            if (SlingshotAimController.Instance != null)
+            SubscribeToSlingshot();
+            SubscribeToJumpAim();
+        }
+
+        private void SubscribeToSlingshot()
+        {
+            if (SlingshotAimController.Instance != null && !_isSubscribedSlingshot)
             {
                 SlingshotAimController.Instance.OnAimStarted -= HandleAimStarted;
                 SlingshotAimController.Instance.OnAimUpdated -= HandleAimUpdated;
@@ -200,9 +210,13 @@ namespace CosmosCritters
                 SlingshotAimController.Instance.OnAimUpdated += HandleAimUpdated;
                 SlingshotAimController.Instance.OnAimReleased += HandleAimReleased;
                 SlingshotAimController.Instance.OnAimCanceled += HandleAimCanceled;
+                _isSubscribedSlingshot = true;
             }
+        }
 
-            if (JumpAimController.Instance != null)
+        private void SubscribeToJumpAim()
+        {
+            if (JumpAimController.Instance != null && !_isSubscribedJumpAim)
             {
                 JumpAimController.Instance.OnJumpAimStarted -= HandleJumpAimStarted;
                 JumpAimController.Instance.OnJumpAimUpdated -= HandleJumpAimUpdated;
@@ -213,30 +227,29 @@ namespace CosmosCritters
                 JumpAimController.Instance.OnJumpAimUpdated += HandleJumpAimUpdated;
                 JumpAimController.Instance.OnJumpAimExecuted += HandleJumpAimExecuted;
                 JumpAimController.Instance.OnJumpAimCanceled += HandleJumpAimCanceled;
+                _isSubscribedJumpAim = true;
             }
-
-            _isSubscribed = true;
         }
 
         private void UnsubscribeFromAimControllers()
         {
-            if (SlingshotAimController.Instance != null)
+            if (SlingshotAimController.Instance != null && _isSubscribedSlingshot)
             {
                 SlingshotAimController.Instance.OnAimStarted -= HandleAimStarted;
                 SlingshotAimController.Instance.OnAimUpdated -= HandleAimUpdated;
                 SlingshotAimController.Instance.OnAimReleased -= HandleAimReleased;
                 SlingshotAimController.Instance.OnAimCanceled -= HandleAimCanceled;
+                _isSubscribedSlingshot = false;
             }
 
-            if (JumpAimController.Instance != null)
+            if (JumpAimController.Instance != null && _isSubscribedJumpAim)
             {
                 JumpAimController.Instance.OnJumpAimStarted -= HandleJumpAimStarted;
                 JumpAimController.Instance.OnJumpAimUpdated -= HandleJumpAimUpdated;
                 JumpAimController.Instance.OnJumpAimExecuted -= HandleJumpAimExecuted;
                 JumpAimController.Instance.OnJumpAimCanceled -= HandleJumpAimCanceled;
+                _isSubscribedJumpAim = false;
             }
-
-            _isSubscribed = false;
         }
 
         #region Slingshot Event Handlers

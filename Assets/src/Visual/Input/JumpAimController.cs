@@ -209,6 +209,12 @@ namespace CosmosCritters
             float gravityMultiplier = _currentActiveHero != null ? _currentActiveHero.GravityMultiplier : 1.0f;
             float finalForce = baseJumpForce * _jumpForceMultiplier * PowerPercentage;
 
+            if (TrajectoryPredictor.Instance != null)
+            {
+                TrajectoryPredictor.Instance.SetTrajectoryColor(Color.white);
+                TrajectoryPredictor.Instance.PredictTrajectory(heroPos, _currentDirection, finalForce, gravityMultiplier);
+            }
+
             OnJumpAimUpdated?.Invoke(heroPos, _currentDirection, finalForce, _currentPowerLevel, gravityMultiplier);
         }
 
@@ -223,6 +229,16 @@ namespace CosmosCritters
 
             _currentDirection = aimVector.sqrMagnitude > 0.01f ? aimVector.normalized : (Vector2)_currentActiveHero.transform.up;
 
+            float baseJumpForce = _currentActiveHero.JumpForce;
+            float gravityMultiplier = _currentActiveHero.GravityMultiplier;
+            float finalForce = baseJumpForce * _jumpForceMultiplier * PowerPercentage;
+
+            if (TrajectoryPredictor.Instance != null)
+            {
+                TrajectoryPredictor.Instance.SetTrajectoryColor(Color.white);
+                TrajectoryPredictor.Instance.PredictTrajectory(heroPos, _currentDirection, finalForce, gravityMultiplier);
+            }
+
             Debug.Log($"[JumpAim] Modo de salto iniciado para {_currentActiveHero.CharacterName}. Nivel: {_currentPowerLevel * 10}%");
             OnJumpAimStarted?.Invoke(heroPos);
         }
@@ -230,6 +246,8 @@ namespace CosmosCritters
         private void ExecuteJump()
         {
             _isAimingJump = false;
+
+            TrajectoryPredictor.Instance?.HideTrajectory();
 
             if (_currentActiveHero == null || _currentActiveHero.IsDead)
             {
@@ -253,6 +271,7 @@ namespace CosmosCritters
             if (!_isAimingJump) return;
 
             _isAimingJump = false;
+            TrajectoryPredictor.Instance?.HideTrajectory();
             Debug.Log("[JumpAim] Apuntado de salto cancelado.");
             OnJumpAimCanceled?.Invoke();
         }

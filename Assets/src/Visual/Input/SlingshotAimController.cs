@@ -96,6 +96,7 @@ namespace CosmosCritters
                 {
                     GameObject go = new GameObject("SlingshotAimSystem");
                     go.AddComponent<SlingshotAimController>();
+                    go.AddComponent<JumpAimController>();
                     go.AddComponent<TrajectoryPredictor>();
                     Debug.Log("[Slingshot] AimSystem auto-creado y configurado en la escena de Gameplay.");
                 }
