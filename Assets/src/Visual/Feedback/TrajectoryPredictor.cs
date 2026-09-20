@@ -36,7 +36,8 @@ namespace CosmosCritters
         private Vector3[] _simulationPoints;
         private GameObject[] _dotPool;
         private SpriteRenderer[] _dotRenderers;
-        private bool _isSubscribed = false;
+        private bool _isSubscribedSlingshot = false;
+        private bool _isSubscribedJumpAim = false;
 
         private void Awake()
         {
