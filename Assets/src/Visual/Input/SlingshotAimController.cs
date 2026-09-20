@@ -76,7 +76,7 @@ namespace CosmosCritters
         {
             if (Instance != null && Instance != this)
             {
-                Destroy(gameObject);
+                Destroy(this);
                 return;
             }
             Instance = this;
@@ -96,6 +96,7 @@ namespace CosmosCritters
                 {
                     GameObject go = new GameObject("SlingshotAimSystem");
                     go.AddComponent<SlingshotAimController>();
+                    go.AddComponent<JumpAimController>();
                     go.AddComponent<TrajectoryPredictor>();
                     Debug.Log("[Slingshot] AimSystem auto-creado y configurado en la escena de Gameplay.");
                 }
@@ -135,6 +136,12 @@ namespace CosmosCritters
         /// </summary>
         private bool CanAim()
         {
+            // Si se está apuntando el salto, no interferir con la resortera
+            if (JumpAimController.Instance != null && JumpAimController.Instance.IsAimingJump)
+            {
+                return false;
+            }
+
             if (TurnManager.Instance == null)
             {
                 // Fallback directo por si se prueba sin TurnManager

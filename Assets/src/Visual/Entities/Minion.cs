@@ -13,6 +13,7 @@ namespace CosmosCritters
         [SerializeField] private float _aggroRadius = 8f;
 
         public float AttackDamage => _attackDamage;
+        public float AggroRadius => _aggroRadius;
 
         public override void ExecuteAITurn()
         {
