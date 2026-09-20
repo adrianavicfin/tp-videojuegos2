@@ -29,8 +29,14 @@ namespace CosmosCritters
 
             Debug.Log($"[ActionJump] {user.CharacterName} salta en dirección {Direction} con Fuerza: {Force:F2}");
             
-            // Aplicar impulso directo sobre la velocidad del Rigidbody2D
-            user.Rigidbody.velocity = Direction * Force;
+            if (user.TryGetComponent<CharacterMovementController>(out var movement))
+            {
+                movement.LaunchJump(Direction, Force);
+            }
+            else
+            {
+                user.Rigidbody.velocity = Direction * Force;
+            }
         }
     }
 }

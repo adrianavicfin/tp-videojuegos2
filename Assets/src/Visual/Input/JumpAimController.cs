@@ -39,7 +39,7 @@ namespace CosmosCritters
 
         [Header("Jump Configuration")]
         [Tooltip("Multiplicador de impulso de salto base sobre el JumpForce del personaje.")]
-        [SerializeField] private float _jumpForceMultiplier = 1.5f;
+        [SerializeField] private float _jumpForceMultiplier = 2.0f;
 
         [Tooltip("Nivel inicial de potencia (1 a 10).")]
         [Range(1, 10)]
@@ -215,13 +215,6 @@ namespace CosmosCritters
         private void StartJumpAim()
         {
             if (_currentActiveHero == null) return;
-
-            // Verificar si el personaje está en el suelo antes de saltar
-            if (_currentActiveHero.TryGetComponent<CharacterMovementController>(out var movement) && !movement.IsGrounded)
-            {
-                Debug.LogWarning("[JumpAim] No se puede iniciar salto en el aire.");
-                return;
-            }
 
             _isAimingJump = true;
             Vector2 heroPos = _currentActiveHero.transform.position;

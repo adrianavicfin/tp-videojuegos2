@@ -30,6 +30,7 @@ namespace CosmosCritters
 
         private float _horizontalInput = 0f;
         private bool _isGrounded = true;
+        private float _jumpCooldownTimer = 0f;
         private Vector2 _surfaceNormal = Vector2.up;
         private Vector2 _surfaceTangent = Vector2.right;
 
@@ -38,6 +39,19 @@ namespace CosmosCritters
         public bool IsGrounded => _isGrounded;
         public Vector2 SurfaceNormal => _surfaceNormal;
         public Vector2 SurfaceTangent => _surfaceTangent;
+
+        /// <summary>
+        /// Aplica un impulso de salto deshabilitando temporalmente el chequeo de suelo para permitir el despegue físico.
+        /// </summary>
+        public void LaunchJump(Vector2 direction, float force)
+        {
+            _isGrounded = false;
+            _jumpCooldownTimer = 0.35f;
+            if (_rb != null)
+            {
+                _rb.velocity = direction.normalized * force;
+            }
+        }
 
         private void Awake()
         {
@@ -137,6 +151,13 @@ namespace CosmosCritters
         /// </summary>
         private void CheckGrounded()
         {
+            if (_jumpCooldownTimer > 0f)
+            {
+                _jumpCooldownTimer -= Time.fixedDeltaTime;
+                _isGrounded = false;
+                return;
+            }
+
             Vector2 feetDirection = -_surfaceNormal;
             int count = Physics2D.RaycastNonAlloc(transform.position, feetDirection, _groundHits, _groundCheckDistance, _groundLayers);
 
