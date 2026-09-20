@@ -43,7 +43,7 @@ namespace CosmosCritters
         {
             if (Instance != null && Instance != this)
             {
-                Destroy(gameObject);
+                Destroy(this);
                 return;
             }
             Instance = this;
@@ -178,6 +178,15 @@ namespace CosmosCritters
                     new GradientAlphaKey[] { new GradientAlphaKey(1f, 0f), new GradientAlphaKey(0.3f, 1f) }
                 );
                 _lineRenderer.colorGradient = gradient;
+
+                if (_lineRenderer.material != null)
+                {
+                    _lineRenderer.material.color = color;
+                    if (_lineRenderer.material.HasProperty("_Color"))
+                        _lineRenderer.material.SetColor("_Color", color);
+                    if (_lineRenderer.material.HasProperty("_BaseColor"))
+                        _lineRenderer.material.SetColor("_BaseColor", color);
+                }
             }
 
             if (_dotRenderers != null)
@@ -338,7 +347,7 @@ namespace CosmosCritters
                 if (i > 2 && stepDist > 0.001f)
                 {
                     RaycastHit2D hit = Physics2D.Raycast(currentPos, stepDir.normalized, stepDist, _collisionMask);
-                    if (hit.collider != null && !hit.collider.isTrigger && !hit.collider.TryGetComponent<Hero>(out _))
+                    if (hit.collider != null && !hit.collider.isTrigger && hit.collider.GetComponentInParent<Hero>() == null)
                     {
                         _simulationPoints[validPointCount++] = new Vector3(hit.point.x, hit.point.y, 0f);
                         break;

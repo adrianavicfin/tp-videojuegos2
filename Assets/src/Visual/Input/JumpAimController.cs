@@ -66,7 +66,7 @@ namespace CosmosCritters
         {
             if (Instance != null && Instance != this)
             {
-                Destroy(gameObject);
+                Destroy(this);
                 return;
             }
             Instance = this;
@@ -89,9 +89,12 @@ namespace CosmosCritters
                     GameObject go = GameObject.Find("SlingshotAimSystem");
                     if (go == null)
                     {
-                        go = new GameObject("JumpAimSystem");
+                        go = new GameObject("SlingshotAimSystem");
                     }
-                    go.AddComponent<JumpAimController>();
+                    if (go.GetComponent<JumpAimController>() == null)
+                    {
+                        go.AddComponent<JumpAimController>();
+                    }
                     Debug.Log("[JumpAim] JumpAimController auto-configurado en la escena.");
                 }
             }
