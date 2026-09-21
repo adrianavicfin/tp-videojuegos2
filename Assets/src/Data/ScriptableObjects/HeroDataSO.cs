@@ -20,6 +20,7 @@ namespace CosmosCritters
         [Header("Role & Loadout")]
         [SerializeField] private HeroRole _role = HeroRole.HeavyDamage;
         [SerializeField] private WeaponDataSO _defaultWeapon;
+        [SerializeField] private AbilityDataSO _secondaryAbility;
 
         public string HeroName => _heroName;
         public Sprite Portrait => _portrait;
@@ -30,5 +31,6 @@ namespace CosmosCritters
         public float GravityMultiplier => _gravityMultiplier;
         public HeroRole Role => _role;
         public WeaponDataSO DefaultWeapon => _defaultWeapon;
+        public AbilityDataSO SecondaryAbility => _secondaryAbility;
     }
 }

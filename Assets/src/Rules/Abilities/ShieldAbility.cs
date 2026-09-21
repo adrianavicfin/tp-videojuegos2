@@ -9,8 +9,8 @@ namespace CosmosCritters
     {
         public int ShieldPoints { get; private set; }
 
-        public ShieldAbility(int shieldPoints = 25, int cooldownTurns = 3) 
-            : base("Escudo Gravitatorio", cooldownTurns)
+        public ShieldAbility(int shieldPoints = 25, int cooldownTurns = 3, string abilityName = "Escudo Gravitatorio", string description = "Genera un campo de defensa que restaura y refuerza la integridad.", Sprite icon = null, Color? themeColor = null) 
+            : base(abilityName, cooldownTurns, description, icon, themeColor ?? new Color(0.25f, 0.75f, 1f, 1f))
         {
             ShieldPoints = Mathf.Max(1, shieldPoints);
         }
