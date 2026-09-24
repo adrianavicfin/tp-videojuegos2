@@ -70,6 +70,23 @@ namespace CosmosCritters
             _explosionRadius = explosionRadius;
             _knockbackForce = knockbackForce;
 
+            // Ignorar colisiones inmediatas con el atacante para evitar auto-detonación en frame 0
+            if (_owner != null)
+            {
+                Collider2D myCol = GetComponent<Collider2D>();
+                Collider2D[] ownerCols = _owner.GetComponentsInChildren<Collider2D>();
+                if (myCol != null && ownerCols != null)
+                {
+                    for (int i = 0; i < ownerCols.Length; i++)
+                    {
+                        if (ownerCols[i] != null)
+                        {
+                            Physics2D.IgnoreCollision(myCol, ownerCols[i], true);
+                        }
+                    }
+                }
+            }
+
             if (_rb != null)
             {
                 _rb.velocity = Vector2.zero;

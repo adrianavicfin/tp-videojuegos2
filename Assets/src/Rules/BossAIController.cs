@@ -34,9 +34,17 @@ namespace CosmosCritters
 
         private Boss _boss;
 
+        public WeaponDataSO BossWeapon => _bossWeapon;
+
         private void Awake()
         {
             _boss = GetComponent<Boss>();
+
+            // Si no se asignó arma en el Inspector, cargar HeavyMissile por defecto
+            if (_bossWeapon == null)
+            {
+                _bossWeapon = Resources.Load<WeaponDataSO>("ScriptableObjects/Weapon_HeavyMissile");
+            }
         }
 
         /// <summary>
@@ -172,7 +180,7 @@ namespace CosmosCritters
             float knockback = _bossWeapon != null ? _bossWeapon.KnockbackForce : _knockbackForce;
             GameObject prefab = _bossWeapon != null ? _bossWeapon.ProjectilePrefab : null;
 
-            Debug.Log($"[BossAIController] {_boss.CharacterName} dispara contra {target?.CharacterName}! Ángulo: {angle:F1}°, Potencia: {power:F1}, Daño: {damage}");
+            Debug.Log($"[BossAIController] {_boss.CharacterName} dispara contra {target?.CharacterName}! Ángulo: {angle:F1}°, Potencia: {power:F1}, Daño: {damage}, Prefab: {(prefab != null ? prefab.name : "null")}");
 
             ICharacterAction shootAction = new ActionShoot(angle, power, damage, prefab, radius, knockback);
 
