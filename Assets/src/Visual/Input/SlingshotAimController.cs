@@ -168,6 +168,8 @@ namespace CosmosCritters
 
         private void HandleAimInput()
         {
+            Vector2 mouseWorldPos = GetMouseWorldPosition();
+
             // 1. Iniciar Apuntado (Clic Izquierdo presionado)
             if (Input.GetMouseButtonDown(0))
             {
@@ -180,7 +182,6 @@ namespace CosmosCritters
 
                 if (_currentActiveHero != null)
                 {
-                    Vector2 mouseWorldPos = GetMouseWorldPosition();
                     Vector2 heroPos = _currentActiveHero.transform.position;
                     float distToHero = Vector2.Distance(mouseWorldPos, heroPos);
 
