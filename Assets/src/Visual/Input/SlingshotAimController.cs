@@ -44,10 +44,10 @@ namespace CosmosCritters
         [SerializeField] private float _minDragThreshold = 0.35f;
 
         [Tooltip("Si es true, permite iniciar el arrastre haciendo clic en cualquier parte de la pantalla mientras sea el turno del héroe.")]
-        [SerializeField] private bool _allowClickAnywhere = true;
+        [SerializeField] private bool _allowClickAnywhere = false;
 
         [Tooltip("Distancia máxima de selección de clic alrededor del héroe para iniciar el tensado si _allowClickAnywhere es false.")]
-        [SerializeField] private float _heroClickRadius = 3.5f;
+        [SerializeField] private float _heroClickRadius = 1.8f;
 
         [Tooltip("Potencia máxima por defecto si el héroe no tiene arma equipada.")]
         [SerializeField] private float _defaultMaxPower = 25f;
@@ -168,24 +168,27 @@ namespace CosmosCritters
 
         private void HandleAimInput()
         {
-            Vector2 mouseWorldPos = GetMouseWorldPosition();
-
             // 1. Iniciar Apuntado (Clic Izquierdo presionado)
             if (Input.GetMouseButtonDown(0))
             {
+                // Si el cursor está sobre un elemento de la UI (por ejemplo el botón de habilidad), IGNORAR el clic del mundo
+                if (UnityEngine.EventSystems.EventSystem.current != null && 
+                    UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject())
+                {
+                    return;
+                }
+
                 if (_currentActiveHero != null)
                 {
+                    Vector2 mouseWorldPos = GetMouseWorldPosition();
                     Vector2 heroPos = _currentActiveHero.transform.position;
                     float distToHero = Vector2.Distance(mouseWorldPos, heroPos);
 
+                    // Sólo iniciar apuntado si el clic se efectúa directamente sobre el héroe activo
                     if (_allowClickAnywhere || distToHero <= _heroClickRadius)
                     {
                         Debug.Log($"[Slingshot] ¡Apuntado iniciado para {_currentActiveHero.CharacterName}! HeroPos: {heroPos}, MousePos: {mouseWorldPos}");
                         StartAim(heroPos);
-                    }
-                    else
-                    {
-                        Debug.Log($"[Slingshot] Clic fuera de rango. Distancia al héroe: {distToHero:F2} > Radio ({_heroClickRadius:F2})");
                     }
                 }
             }

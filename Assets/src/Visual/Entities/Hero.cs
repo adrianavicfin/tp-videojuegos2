@@ -4,7 +4,7 @@ namespace CosmosCritters
 {
     /// <summary>
     /// Héroe alienígena controlado por jugador en la cola de turnos.
-    /// Configura su modelo de estadísticas y su Habilidad Secundaria Polimórfica (Hito 2).
+    /// Configura su modelo de estadísticas, arma y su Habilidad Secundaria Polimórfica Data-Driven.
     /// </summary>
     public class Hero : Character
     {
@@ -17,7 +17,7 @@ namespace CosmosCritters
         public int SlotIndex { get; private set; } = 1;
 
         /// <summary>
-        /// Habilidad secundaria polimórfica asignada al héroe según su rol.
+        /// Habilidad secundaria polimórfica asignada al héroe (instanciada desde HeroDataSO o por defecto).
         /// </summary>
         public Ability SecondaryAbility { get; private set; }
 
@@ -67,7 +67,15 @@ namespace CosmosCritters
                     _spriteRenderer.sprite = _heroData.CharacterSprite;
                 }
 
-                AssignSecondaryAbilityByRole(_heroData.Role);
+                // Arquitectura desacoplada: instanciación data-driven directa sin switches rígidos
+                if (_heroData.SecondaryAbility != null)
+                {
+                    SecondaryAbility = _heroData.SecondaryAbility.CreateRuntimeAbility();
+                }
+                else
+                {
+                    AssignDefaultSecondaryAbility();
+                }
             }
         }
 
@@ -78,29 +86,14 @@ namespace CosmosCritters
             Debug.Log($"[Hero] {_characterName} equipó el arma: {weapon.WeaponName}");
         }
 
+        public void SetSecondaryAbility(Ability ability)
+        {
+            SecondaryAbility = ability;
+        }
+
         private void AssignDefaultSecondaryAbility()
         {
             SecondaryAbility = new HealAbility(25, 2);
-        }
-
-        private void AssignSecondaryAbilityByRole(HeroRole role)
-        {
-            switch (role)
-            {
-                case HeroRole.Support:
-                    SecondaryAbility = new HealAbility(35, 2);
-                    break;
-                case HeroRole.HeavyDamage:
-                    SecondaryAbility = new ShieldAbility(30, 3);
-                    break;
-                case HeroRole.GravitationalControl:
-                case HeroRole.Scout:
-                    SecondaryAbility = new TeleportAbility(3);
-                    break;
-                default:
-                    SecondaryAbility = new HealAbility(20, 2);
-                    break;
-            }
         }
 
         #region Turn Queue Lifecycle

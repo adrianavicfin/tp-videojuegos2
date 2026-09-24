@@ -9,8 +9,8 @@ namespace CosmosCritters
     {
         public int HealAmount { get; private set; }
 
-        public HealAbility(int healAmount = 30, int cooldownTurns = 2) 
-            : base("Curación de Plasma", cooldownTurns)
+        public HealAbility(int healAmount = 30, int cooldownTurns = 2, string abilityName = "Curación de Plasma", string description = "Restaura salud al usuario o aliado objetivo.", Sprite icon = null, Color? themeColor = null) 
+            : base(abilityName, cooldownTurns, description, icon, themeColor ?? new Color(0.2f, 0.95f, 0.4f, 1f))
         {
             HealAmount = Mathf.Max(1, healAmount);
         }

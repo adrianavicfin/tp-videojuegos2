@@ -11,6 +11,7 @@ namespace CosmosCritters
     {
         [Header("HUD View Reference")]
         [SerializeField] private PlayerHUDView _activePlayerHUD;
+        [SerializeField] private AbilityButtonView _abilityButtonView;
 
         [Header("Boss HUD View (Opcional)")]
         [SerializeField] private PlayerHUDView _bossHUD;
@@ -20,6 +21,11 @@ namespace CosmosCritters
 
         private void Start()
         {
+            if (_abilityButtonView == null)
+            {
+                _abilityButtonView = FindObjectOfType<AbilityButtonView>(true);
+            }
+
             if (TurnManager.Instance != null)
             {
                 TurnManager.Instance.OnTurnStarted += HandleTurnStarted;
@@ -66,6 +72,7 @@ namespace CosmosCritters
 
             if (activeChar is Hero hero)
             {
+                _abilityButtonView?.BindHero(hero);
                 _activePlayerHUD.SetSlotIndex(hero.SlotIndex);
                 if (hero.HeroData != null && hero.HeroData.Portrait != null)
                 {
@@ -76,9 +83,13 @@ namespace CosmosCritters
                     _activePlayerHUD.SetPortrait(hero.SpriteRenderer.sprite, hero.SpriteRenderer.color);
                 }
             }
-            else if (activeChar.SpriteRenderer != null && activeChar.SpriteRenderer.sprite != null)
+            else
             {
-                _activePlayerHUD.SetPortrait(activeChar.SpriteRenderer.sprite, activeChar.SpriteRenderer.color);
+                _abilityButtonView?.UnbindHero();
+                if (activeChar.SpriteRenderer != null && activeChar.SpriteRenderer.sprite != null)
+                {
+                    _activePlayerHUD.SetPortrait(activeChar.SpriteRenderer.sprite, activeChar.SpriteRenderer.color);
+                }
             }
         }
 
@@ -88,6 +99,8 @@ namespace CosmosCritters
             {
                 _activePresenter.SetTurnActive(false);
             }
+
+            _abilityButtonView?.UnbindHero();
         }
     }
 }

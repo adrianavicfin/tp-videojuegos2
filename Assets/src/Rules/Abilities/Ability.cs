@@ -4,23 +4,32 @@ using UnityEngine;
 namespace CosmosCritters
 {
     /// <summary>
-    /// Clase abstracta base para habilidades secundarias de los personajes.
-    /// Cumple el requisito de Herencia y Polimorfismo para Hito 2.
+    /// Clase abstracta base para habilidades secundarias de los personajes en tiempo de ejecución.
+    /// Cumple el requisito de Herencia y Polimorfismo para Hito 2 y Hito 3.
     /// </summary>
     public abstract class Ability
     {
         public string AbilityName { get; protected set; }
+        public string Description { get; protected set; }
+        public Sprite Icon { get; protected set; }
+        public Color ThemeColor { get; protected set; } = Color.cyan;
         public int CooldownTurns { get; protected set; }
         public int CurrentCooldown { get; protected set; }
         public bool IsReady => CurrentCooldown <= 0;
 
         public event Action<int> OnCooldownChanged;
 
-        public Ability(string abilityName, int cooldownTurns)
+        public Ability(string abilityName, int cooldownTurns, string description = "", Sprite icon = null, Color? themeColor = null)
         {
             AbilityName = abilityName;
             CooldownTurns = Math.Max(0, cooldownTurns);
             CurrentCooldown = 0;
+            Description = description;
+            Icon = icon;
+            if (themeColor.HasValue)
+            {
+                ThemeColor = themeColor.Value;
+            }
         }
 
         /// <summary>
@@ -53,7 +62,7 @@ namespace CosmosCritters
         protected abstract void ExecuteEffect(Character user, Character target);
 
         /// <summary>
-        /// Se invoca al inicio de cada ronda para reducir el tiempo de espera.
+        /// Se invoca al inicio de cada turno para reducir el tiempo de espera.
         /// </summary>
         public virtual void TickCooldown()
         {
