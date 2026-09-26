@@ -15,11 +15,15 @@ namespace CosmosCritters
         [SerializeField] private float _knockbackForce = 15f;
         [SerializeField] private GameObject _explosionVfxPrefab;
         [SerializeField] private float _maxLifetime = 10f;
+        [SerializeField] private bool _useGeneratedPlaceholder = true;
 
         private Rigidbody2D _rb;
+        private SpriteRenderer _spriteRenderer;
         private Character _owner;
         private bool _hasExploded = false;
         private float _aliveTimer = 0f;
+
+        private static Sprite _generatedPlaceholderSprite;
 
         // Buffer pre-alocado para detección de explosión Zero-Alloc
         private readonly Collider2D[] _explosionHits = new Collider2D[20];
@@ -49,6 +53,60 @@ namespace CosmosCritters
         private void Awake()
         {
             _rb = GetComponent<Rigidbody2D>();
+            _spriteRenderer = GetComponent<SpriteRenderer>();
+
+            if (_useGeneratedPlaceholder && _spriteRenderer != null)
+            {
+                _spriteRenderer.sprite = GetOrCreatePlaceholderSprite();
+                _spriteRenderer.sortingOrder = Mathf.Max(_spriteRenderer.sortingOrder, 100);
+            }
+        }
+
+        private static Sprite GetOrCreatePlaceholderSprite()
+        {
+            if (_generatedPlaceholderSprite != null)
+            {
+                return _generatedPlaceholderSprite;
+            }
+
+            const int textureSize = 32;
+            const float pixelsPerUnit = 16f;
+            Texture2D texture = new Texture2D(textureSize, textureSize, TextureFormat.RGBA32, false);
+            texture.name = "ProjectilePlaceholderTexture";
+            texture.filterMode = FilterMode.Bilinear;
+            texture.wrapMode = TextureWrapMode.Clamp;
+            texture.hideFlags = HideFlags.HideAndDontSave;
+
+            Color32[] pixels = new Color32[textureSize * textureSize];
+            Vector2 center = new Vector2((textureSize - 1) * 0.5f, (textureSize - 1) * 0.5f);
+            float radius = textureSize * 0.45f;
+            float radiusSquared = radius * radius;
+
+            for (int y = 0; y < textureSize; y++)
+            {
+                for (int x = 0; x < textureSize; x++)
+                {
+                    float deltaX = x - center.x;
+                    float deltaY = y - center.y;
+                    bool insideCircle = deltaX * deltaX + deltaY * deltaY <= radiusSquared;
+                    pixels[y * textureSize + x] = insideCircle
+                        ? new Color32(255, 255, 255, 255)
+                        : new Color32(255, 255, 255, 0);
+                }
+            }
+
+            texture.SetPixels32(pixels);
+            texture.Apply(false, true);
+
+            _generatedPlaceholderSprite = Sprite.Create(
+                texture,
+                new Rect(0f, 0f, textureSize, textureSize),
+                new Vector2(0.5f, 0.5f),
+                pixelsPerUnit);
+            _generatedPlaceholderSprite.name = "ProjectilePlaceholderSprite";
+            _generatedPlaceholderSprite.hideFlags = HideFlags.HideAndDontSave;
+
+            return _generatedPlaceholderSprite;
         }
 
         private void Update()
