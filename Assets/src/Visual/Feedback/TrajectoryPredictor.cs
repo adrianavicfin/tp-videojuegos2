@@ -55,6 +55,9 @@ namespace CosmosCritters
         private SpriteRenderer[] _dotRenderers;
         private bool _isSubscribedSlingshot = false;
         private bool _isSubscribedJumpAim = false;
+        private WeaponDataSO _cachedProjectileWeapon;
+        private Rigidbody2D _cachedProjectileBody;
+        private Projectile _cachedProjectile;
 
         private void Awake()
         {
@@ -293,7 +296,10 @@ namespace CosmosCritters
         private void HandleAimUpdated(Vector2 origin, Vector2 direction, float power, float normalizedPower)
         {
             SetTrajectoryColor(_trajectoryColor);
-            PredictTrajectory(origin, direction, power);
+            WeaponDataSO weapon = SlingshotAimController.Instance != null
+                ? SlingshotAimController.Instance.CurrentHero?.EquippedWeapon
+                : null;
+            PredictProjectileTrajectory(origin, direction, power, weapon);
         }
 
         private void HandleAimReleased(Vector2 direction, float power)
@@ -344,6 +350,40 @@ namespace CosmosCritters
             Vector2 currentPos = startPos + (direction.normalized * 1.0f);
             Vector2 velocity = direction.normalized * power;
 
+            SimulateTrajectory(currentPos, velocity, Mathf.Max(_simulatedMass, 0.01f), gravityMultiplier, _timeStep);
+        }
+
+        private void PredictProjectileTrajectory(Vector2 origin, Vector2 direction, float impulse, WeaponDataSO weapon)
+        {
+            if (weapon == null || weapon.ProjectilePrefab == null)
+            {
+                HideTrajectory();
+                return;
+            }
+
+            if (_cachedProjectileWeapon != weapon)
+            {
+                _cachedProjectileWeapon = weapon;
+                _cachedProjectileBody = weapon.ProjectilePrefab.GetComponent<Rigidbody2D>();
+                _cachedProjectile = weapon.ProjectilePrefab.GetComponent<Projectile>();
+            }
+
+            if (_cachedProjectileBody == null || _cachedProjectile == null)
+            {
+                HideTrajectory();
+                return;
+            }
+
+            float mass = Mathf.Max(_cachedProjectileBody.mass, 0.01f);
+            Vector2 launchDirection = direction.normalized;
+            Vector2 spawnPosition = origin + launchDirection * 1.2f;
+            Vector2 initialVelocity = launchDirection * (impulse / mass);
+            SimulateTrajectory(spawnPosition, initialVelocity, mass, _cachedProjectile.GravityResponse, Time.fixedDeltaTime);
+        }
+
+        private void SimulateTrajectory(Vector2 currentPos, Vector2 velocity, float mass, float gravityMultiplier, float stepTime)
+        {
+
             int validPointCount = 0;
             _simulationPoints[validPointCount++] = new Vector3(currentPos.x, currentPos.y, 0f);
 
@@ -351,11 +391,11 @@ namespace CosmosCritters
             {
                 // 1. Calcular gravedad acumulada en el punto actual escalada por el multiplicador
                 Vector2 gravityForce = GravityBody.GetTotalGravitationalPull(currentPos) * gravityMultiplier;
-                Vector2 acceleration = gravityForce / _simulatedMass;
+                Vector2 acceleration = gravityForce / mass;
 
                 // 2. Integración de velocidad y posición
-                velocity += acceleration * _timeStep;
-                Vector2 nextPos = currentPos + (velocity * _timeStep);
+                velocity += acceleration * stepTime;
+                Vector2 nextPos = currentPos + (velocity * stepTime);
 
                 // 3. Chequeo de colisión en el trayecto (ignorando al propio héroe y triggers)
                 Vector2 stepDir = nextPos - currentPos;

@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace CosmosCritters
 {
@@ -43,12 +44,6 @@ namespace CosmosCritters
         [Tooltip("Distancia mínima de arrastre para considerar un tiro válido (evita micro-clics accidentales).")]
         [SerializeField] private float _minDragThreshold = 0.35f;
 
-        [Tooltip("Si es true, permite iniciar el arrastre haciendo clic en cualquier parte de la pantalla mientras sea el turno del héroe.")]
-        [SerializeField] private bool _allowClickAnywhere = false;
-
-        [Tooltip("Distancia máxima de selección de clic alrededor del héroe para iniciar el tensado si _allowClickAnywhere es false.")]
-        [SerializeField] private float _heroClickRadius = 1.8f;
-
         [Tooltip("Potencia máxima por defecto si el héroe no tiene arma equipada.")]
         [SerializeField] private float _defaultMaxPower = 25f;
 
@@ -62,6 +57,9 @@ namespace CosmosCritters
         private float _currentPower = 0f;
         private float _maxAllowedPower = 25f;
         private Hero _currentActiveHero;
+
+        // Buffer reutilizable para no generar basura al comprobar el clic sobre el heroe.
+        private readonly Collider2D[] _clickHits = new Collider2D[8];
 
         #region Properties
         public bool IsAiming => _isAiming;
@@ -87,20 +85,31 @@ namespace CosmosCritters
             }
         }
 
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
-        private static void EnsureInstanceInScene()
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+        private static void RegisterSceneBootstrap()
         {
-            if (Instance == null && UnityEngine.Object.FindObjectOfType<SlingshotAimController>() == null)
+            SceneManager.sceneLoaded -= EnsureAimSystemInScene;
+            SceneManager.sceneLoaded += EnsureAimSystemInScene;
+        }
+
+        private static void EnsureAimSystemInScene(Scene scene, LoadSceneMode mode)
+        {
+            if (UnityEngine.Object.FindObjectOfType<TurnManager>() == null) return;
+
+            GameObject aimSystem = GameObject.Find("SlingshotAimSystem");
+            if (aimSystem == null)
             {
-                if (UnityEngine.Object.FindObjectOfType<TurnManager>() != null || UnityEngine.Object.FindObjectOfType<Hero>() != null)
-                {
-                    GameObject go = new GameObject("SlingshotAimSystem");
-                    go.AddComponent<SlingshotAimController>();
-                    go.AddComponent<JumpAimController>();
-                    go.AddComponent<TrajectoryPredictor>();
-                    Debug.Log("[Slingshot] AimSystem auto-creado y configurado en la escena de Gameplay.");
-                }
+                aimSystem = new GameObject("SlingshotAimSystem");
             }
+
+            if (UnityEngine.Object.FindObjectOfType<SlingshotAimController>() == null)
+                aimSystem.AddComponent<SlingshotAimController>();
+            if (UnityEngine.Object.FindObjectOfType<JumpAimController>() == null)
+                aimSystem.AddComponent<JumpAimController>();
+            if (UnityEngine.Object.FindObjectOfType<TrajectoryPredictor>() == null)
+                aimSystem.AddComponent<TrajectoryPredictor>();
+
+            Debug.Log("[AimSystem] Controles de disparo, salto y predicción disponibles en Gameplay.");
         }
 
         private Vector2 GetMouseWorldPosition()
@@ -168,6 +177,8 @@ namespace CosmosCritters
 
         private void HandleAimInput()
         {
+            Vector2 mouseWorldPos = GetMouseWorldPosition();
+
             // 1. Iniciar Apuntado (Clic Izquierdo presionado)
             if (Input.GetMouseButtonDown(0))
             {
@@ -180,12 +191,11 @@ namespace CosmosCritters
 
                 if (_currentActiveHero != null)
                 {
-                    Vector2 mouseWorldPos = GetMouseWorldPosition();
                     Vector2 heroPos = _currentActiveHero.transform.position;
-                    float distToHero = Vector2.Distance(mouseWorldPos, heroPos);
 
-                    // Sólo iniciar apuntado si el clic se efectúa directamente sobre el héroe activo
-                    if (_allowClickAnywhere || distToHero <= _heroClickRadius)
+                    // El apuntado solo comienza si el puntero impacta un collider
+                    // perteneciente al heroe activo o a uno de sus hijos.
+                    if (IsPointerOverActiveHero(mouseWorldPos))
                     {
                         Debug.Log($"[Slingshot] ¡Apuntado iniciado para {_currentActiveHero.CharacterName}! HeroPos: {heroPos}, MousePos: {mouseWorldPos}");
                         StartAim(heroPos);
@@ -211,6 +221,31 @@ namespace CosmosCritters
             {
                 ReleaseAim();
             }
+        }
+
+        private bool IsPointerOverActiveHero(Vector2 pointerWorldPosition)
+        {
+            if (_currentActiveHero == null || !_currentActiveHero.gameObject.activeInHierarchy)
+            {
+                return false;
+            }
+
+            int hitCount = Physics2D.OverlapPointNonAlloc(pointerWorldPosition, _clickHits);
+            Transform heroTransform = _currentActiveHero.transform;
+
+            for (int i = 0; i < hitCount; i++)
+            {
+                Collider2D hit = _clickHits[i];
+                if (hit == null || !hit.enabled || hit.isTrigger) continue;
+
+                Transform hitTransform = hit.transform;
+                if (hitTransform == heroTransform || hitTransform.IsChildOf(heroTransform))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private void StartAim(Vector2 origin)

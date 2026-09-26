@@ -79,27 +79,6 @@ namespace CosmosCritters
             }
         }
 
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
-        private static void EnsureInstanceInScene()
-        {
-            if (Instance == null && UnityEngine.Object.FindObjectOfType<JumpAimController>() == null)
-            {
-                if (UnityEngine.Object.FindObjectOfType<TurnManager>() != null || UnityEngine.Object.FindObjectOfType<Hero>() != null)
-                {
-                    GameObject go = GameObject.Find("SlingshotAimSystem");
-                    if (go == null)
-                    {
-                        go = new GameObject("SlingshotAimSystem");
-                    }
-                    if (go.GetComponent<JumpAimController>() == null)
-                    {
-                        go.AddComponent<JumpAimController>();
-                    }
-                    Debug.Log("[JumpAim] JumpAimController auto-configurado en la escena.");
-                }
-            }
-        }
-
         private Vector2 GetMouseWorldPosition()
         {
             if (_mainCamera == null)

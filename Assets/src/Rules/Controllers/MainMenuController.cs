@@ -116,19 +116,29 @@ namespace CosmosCritters
         #region Match Launch & Persistence
         public void StartMatch()
         {
-            if (_selectedHeroes.Count == 0 && _availableHeroes.Count > 0)
+            if (_selectedHeroes.Count == 0)
             {
-                _selectedHeroes.Add(_availableHeroes[0]);
+                Debug.LogWarning("[MainMenu] Selecciona al menos un heroe antes de iniciar la partida.");
+                return;
+            }
+
+            if (_selectedHeroes.Count > 4)
+            {
+                _selectedHeroes.RemoveRange(4, _selectedHeroes.Count - 4);
             }
 
             MatchSettings settings = new MatchSettings(_selectedHeroes, _selectedMapIndex, _turnDuration);
 
-            if (GameManager.Instance != null)
+            if (GameManager.Instance == null)
             {
-                GameManager.Instance.SetMatchSettings(settings);
+                Debug.LogError("[MainMenu] No existe GameManager. Se cancela la carga para no perder la seleccion de heroes.");
+                return;
             }
 
-            Debug.Log($"[MainMenu] Iniciando partida... Cargando escena '{_gameSceneName}'");
+
+            GameManager.Instance.SetMatchSettings(settings);
+
+            Debug.Log($"[MainMenu] Iniciando partida con {_selectedHeroes.Count} heroes. Cargando escena '{_gameSceneName}'");
             SceneManager.LoadScene(_gameSceneName);
         }
         #endregion

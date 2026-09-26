@@ -4,8 +4,8 @@ namespace CosmosCritters
 {
     /// <summary>
     /// Controlador de desplazamiento físico orbital sobre superficies planetarias curvas (H3-T5).
-    /// Proyecta el input horizontal (A/D o flechas) perpendicular a la gravedad radial (tangente a la superficie)
-    /// y alinea automáticamente al personaje con la normal del terreno en FixedUpdate.
+    /// Proyecta el input horizontal (A/D o flechas) sobre la tangente a la superficie,
+    /// aplica el salto solicitado por JumpAimController y alinea al personaje en FixedUpdate.
     /// </summary>
     [RequireComponent(typeof(Character), typeof(Rigidbody2D), typeof(Collider2D))]
     public class CharacterMovementController : MonoBehaviour
@@ -23,10 +23,6 @@ namespace CosmosCritters
         [Tooltip("Distancia del Raycast hacia los pies para detectar suelo.")]
         [SerializeField] private float _groundCheckDistance = 1.3f;
 
-        [Header("Jump Configuration")]
-        [Tooltip("Multiplicador de fuerza de salto.")]
-        [SerializeField] private float _jumpForceMultiplier = 2.0f;
-
         private Character _character;
         private Rigidbody2D _rb;
         private Collider2D _ownCollider;
@@ -38,16 +34,9 @@ namespace CosmosCritters
         private Vector2 _surfaceNormal = Vector2.up;
         private Vector2 _surfaceTangent = Vector2.right;
 
-        // Estado interno de salto táctico en 2 fases
-        private bool _isAimingJump = false;
-        private int _jumpPowerLevel = 10; // 1 = 10%, 10 = 100%
-        private Vector2 _currentJumpDirection = Vector2.up;
-
         private readonly RaycastHit2D[] _groundHits = new RaycastHit2D[8];
 
         public bool IsGrounded => _isGrounded;
-        public bool IsAimingJump => _isAimingJump;
-        public int JumpPowerLevel => _jumpPowerLevel;
         public Vector2 SurfaceNormal => _surfaceNormal;
         public Vector2 SurfaceTangent => _surfaceTangent;
 
@@ -86,25 +75,18 @@ namespace CosmosCritters
         {
             if (!CanMove())
             {
-                if (_isAimingJump)
-                {
-                    CancelJumpAim();
-                }
                 _horizontalInput = 0f;
                 return;
             }
 
-            // 1. Manejo de Salto Direccional en 2 Fases (Barra Espaciadora)
-            HandleJumpInput();
-
-            // 2. Si está en modo apuntado de salto, no caminar
-            if (_isAimingJump)
+            // El salto se apunta desde JumpAimController; mientras tanto no caminar.
+            if (JumpAimController.Instance != null && JumpAimController.Instance.IsAimingJump)
             {
                 _horizontalInput = 0f;
                 return;
             }
 
-            // 3. Capturar entrada horizontal del jugador (A/D o Flechas)
+            // Capturar entrada horizontal del jugador (A/D o flechas).
             _horizontalInput = Input.GetAxisRaw("Horizontal");
 
             // Voltear el sprite según la dirección de marcha relativa
@@ -112,124 +94,6 @@ namespace CosmosCritters
             {
                 _spriteRenderer.flipX = _horizontalInput < 0f;
             }
-        }
-
-        private void HandleJumpInput()
-        {
-            // Fase 1 / Fase 2 con Barra Espaciadora
-            if (Input.GetKeyDown(KeyCode.Space))
-            {
-                if (!_isAimingJump)
-                {
-                    StartJumpAim();
-                }
-                else
-                {
-                    ExecuteJump();
-                    return;
-                }
-            }
-
-            if (!_isAimingJump) return;
-
-            // Cancelar con Clic Derecho o Escape
-            if (Input.GetMouseButtonDown(1) || Input.GetKeyDown(KeyCode.Escape))
-            {
-                CancelJumpAim();
-                return;
-            }
-
-            // Regular potencia con W/S o Flechas Arriba/Abajo (de 1 a 10 = 10% a 100%)
-            if (Input.GetKeyDown(KeyCode.W) || Input.GetKeyDown(KeyCode.UpArrow))
-            {
-                _jumpPowerLevel = Mathf.Min(10, _jumpPowerLevel + 1);
-                Debug.Log($"[CharacterMovementController] Potencia de salto: {_jumpPowerLevel * 10}%");
-            }
-            else if (Input.GetKeyDown(KeyCode.S) || Input.GetKeyDown(KeyCode.DownArrow))
-            {
-                _jumpPowerLevel = Mathf.Max(1, _jumpPowerLevel - 1);
-                Debug.Log($"[CharacterMovementController] Potencia de salto: {_jumpPowerLevel * 10}%");
-            }
-
-            // Actualizar vector de puntería hacia el cursor del mouse
-            Vector2 mouseWorld = GetMouseWorldPosition();
-            Vector2 heroPos = (Vector2)transform.position;
-            Vector2 aimDir = mouseWorld - heroPos;
-            if (aimDir.sqrMagnitude > 0.01f)
-            {
-                _currentJumpDirection = aimDir.normalized;
-            }
-
-            float baseJump = _character != null ? _character.JumpForce : 7f;
-            float gravMult = _character != null ? _character.GravityMultiplier : 1.0f;
-            float finalForce = baseJump * _jumpForceMultiplier * (_jumpPowerLevel * 0.10f);
-
-            // Renderizar la parábola blanca en tiempo real
-            if (TrajectoryPredictor.Instance != null)
-            {
-                TrajectoryPredictor.Instance.SetTrajectoryColor(Color.white);
-                TrajectoryPredictor.Instance.PredictTrajectory(heroPos, _currentJumpDirection, finalForce, gravMult);
-            }
-        }
-
-        private void StartJumpAim()
-        {
-            _isAimingJump = true;
-            Vector2 mouseWorld = GetMouseWorldPosition();
-            Vector2 heroPos = (Vector2)transform.position;
-            Vector2 aimDir = mouseWorld - heroPos;
-            _currentJumpDirection = aimDir.sqrMagnitude > 0.01f ? aimDir.normalized : (Vector2)transform.up;
-
-            float baseJump = _character != null ? _character.JumpForce : 7f;
-            float gravMult = _character != null ? _character.GravityMultiplier : 1.0f;
-            float finalForce = baseJump * _jumpForceMultiplier * (_jumpPowerLevel * 0.10f);
-
-            if (TrajectoryPredictor.Instance != null)
-            {
-                TrajectoryPredictor.Instance.SetTrajectoryColor(Color.white);
-                TrajectoryPredictor.Instance.PredictTrajectory(heroPos, _currentJumpDirection, finalForce, gravMult);
-            }
-
-            Debug.Log($"[CharacterMovementController] Modo de salto iniciado para {_character?.CharacterName}. Potencia: {_jumpPowerLevel * 10}%");
-        }
-
-        private void ExecuteJump()
-        {
-            _isAimingJump = false;
-            TrajectoryPredictor.Instance?.HideTrajectory();
-
-            float baseJump = _character != null ? _character.JumpForce : 7f;
-            float finalForce = baseJump * _jumpForceMultiplier * (_jumpPowerLevel * 0.10f);
-
-            Debug.Log($"[CharacterMovementController] ¡Salto confirmado! Dirección: {_currentJumpDirection}, Fuerza: {finalForce:F2}");
-
-            if (_character is Hero hero)
-            {
-                hero.ExecuteJump(_currentJumpDirection, finalForce);
-            }
-            else
-            {
-                LaunchJump(_currentJumpDirection, finalForce);
-            }
-        }
-
-        public void CancelJumpAim()
-        {
-            if (!_isAimingJump) return;
-            _isAimingJump = false;
-            TrajectoryPredictor.Instance?.HideTrajectory();
-            Debug.Log("[CharacterMovementController] Apuntado de salto cancelado.");
-        }
-
-        private Vector2 GetMouseWorldPosition()
-        {
-            Camera cam = Camera.main;
-            if (cam == null) return Vector2.zero;
-
-            Vector3 mouseScreen = Input.mousePosition;
-            mouseScreen.z = Mathf.Abs(cam.transform.position.z);
-            Vector3 worldPos3D = cam.ScreenToWorldPoint(mouseScreen);
-            return new Vector2(worldPos3D.x, worldPos3D.y);
         }
 
         private void FixedUpdate()
