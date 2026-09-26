@@ -13,7 +13,7 @@ GameObject:
   - component: {fileID: 5533424193253707299}
   - component: {fileID: 4490835706945581966}
   - component: {fileID: 8317146226744954318}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: ClusterBombProjectile
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -169,3 +169,4 @@ MonoBehaviour:
   _knockbackForce: 20
   _explosionVfxPrefab: {fileID: 0}
   _useGeneratedPlaceholder: 1
+  _gravityResponse: 0.1

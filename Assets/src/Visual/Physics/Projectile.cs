@@ -16,6 +16,9 @@ namespace CosmosCritters
         [SerializeField] private GameObject _explosionVfxPrefab;
         [SerializeField] private float _maxLifetime = 10f;
         [SerializeField] private bool _useGeneratedPlaceholder = true;
+        [Header("Ballistics")]
+        [Tooltip("Porcion de la fuerza gravitatoria de los planetas aplicada a este proyectil. Los personajes conservan su propia gravedad.")]
+        [SerializeField, Range(0f, 1f)] private float _gravityResponse = 0.1f;
 
         private Rigidbody2D _rb;
         private SpriteRenderer _spriteRenderer;
@@ -31,12 +34,13 @@ namespace CosmosCritters
         #region IGravityAffected
         public Rigidbody2D Rigidbody => _rb;
         public Transform Transform => transform;
+        public float GravityResponse => _gravityResponse;
 
         public void ApplyGravitationalPull(Vector2 force)
         {
             if (_rb != null && !_rb.isKinematic)
             {
-                _rb.AddForce(force, ForceMode2D.Force);
+                _rb.AddForce(force * _gravityResponse, ForceMode2D.Force);
             }
         }
 
@@ -116,8 +120,9 @@ namespace CosmosCritters
             _aliveTimer += Time.deltaTime;
             if (_aliveTimer >= _maxLifetime)
             {
-                Debug.LogWarning($"[Projectile] Tiempo de vida límite ({_maxLifetime}s) alcanzado. Detonando por seguridad.");
-                Explode();
+                _hasExploded = true;
+                Debug.LogWarning($"[Projectile] {name} agotó su tiempo de vida ({_maxLifetime}s) sin impactar.");
+                FinishFlight();
             }
         }
 
@@ -155,15 +160,36 @@ namespace CosmosCritters
         private void OnCollisionEnter2D(Collision2D collision)
         {
             if (_hasExploded) return;
+
+            Collider2D hit = collision.collider;
+            if (hit != null && hit.GetComponentInParent<Boss>() != null)
+            {
+                Debug.Log($"[Projectile] {name} impactó directamente contra el Boss en {transform.position}.");
+            }
+            else if (hit != null && (hit.GetComponentInParent<GravityBody>() != null || hit.gameObject.layer == LayerMask.NameToLayer("Ground")))
+            {
+                Debug.Log($"[Projectile] {name} impactó contra el suelo en {transform.position}.");
+            }
+            else
+            {
+                Debug.Log($"[Projectile] {name} impactó contra {collision.gameObject.name} en {transform.position}.");
+            }
+
             Explode();
+        }
+
+        public void ExitMap()
+        {
+            if (_hasExploded) return;
+            _hasExploded = true;
+            Debug.Log($"[Projectile] {name} salió del mapa por la KillZone en {transform.position}. Disparo perdido.");
+            FinishFlight();
         }
 
         public void Explode()
         {
             if (_hasExploded) return;
             _hasExploded = true;
-
-            Debug.Log($"[Projectile] ¡Explosión en {transform.position}! Radio: {_explosionRadius}, Daño: {_damage}");
 
             int hitCount = Physics2D.OverlapCircleNonAlloc(transform.position, _explosionRadius, _explosionHits);
 
@@ -210,11 +236,12 @@ namespace CosmosCritters
                 Instantiate(_explosionVfxPrefab, transform.position, Quaternion.identity);
             }
 
-            if (TurnManager.Instance != null)
-            {
-                TurnManager.Instance.NotifyActionResolved();
-            }
+            FinishFlight();
+        }
 
+        private void FinishFlight()
+        {
+            TurnManager.Instance?.NotifyActionResolved();
             Destroy(gameObject);
         }
 

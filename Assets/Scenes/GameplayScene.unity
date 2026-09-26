@@ -1055,7 +1055,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a2c43d4d16f9bf043bc37cb494cdfa83, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _maxSimulationSteps: 8
+  _maxSimulationSteps: 100
   _timeStep: 0.05
   _simulatedMass: 1
   _collisionMask:

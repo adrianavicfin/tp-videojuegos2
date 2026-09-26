@@ -43,8 +43,7 @@ namespace CosmosCritters
             // 2. Caso B: Un Proyectil salió de los límites orbitales del mapa
             else if (other.TryGetComponent<Projectile>(out var projectile))
             {
-                Debug.Log("[KillZone] Proyectil perdido en el espacio profundo.");
-                projectile.Explode();
+                projectile.ExitMap();
             }
             // 3. Caso C: Escombros o esferas físicas sueltas
             else if (_destroyDebris && other.GetComponent<Rigidbody2D>() != null)
