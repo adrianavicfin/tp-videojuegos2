@@ -32,6 +32,7 @@ namespace CosmosCritters
         [SerializeField] private TextMeshProUGUI _mapText;
         [SerializeField] private TextMeshProUGUI _turnDurationText;
         [SerializeField] private Button _startMatchButton;
+        [SerializeField] private List<Button> _heroSelectionButtons = new List<Button>();
 
         private void Awake()
         {
@@ -48,10 +49,8 @@ namespace CosmosCritters
                 _controller.OnTurnDurationChanged += UpdateTurnDurationDisplay;
             }
 
-            if (_startMatchButton != null && _controller != null)
-            {
-                _startMatchButton.onClick.AddListener(_controller.StartMatch);
-            }
+            // StartMatch ya esta conectado como PersistentCall en MainMenu.unity.
+            // No agregarlo tambien por codigo: un mismo clic cargaria GameplayScene dos veces.
         }
 
         private void OnDisable()
@@ -63,10 +62,6 @@ namespace CosmosCritters
                 _controller.OnTurnDurationChanged -= UpdateTurnDurationDisplay;
             }
 
-            if (_startMatchButton != null && _controller != null)
-            {
-                _startMatchButton.onClick.RemoveListener(_controller.StartMatch);
-            }
         }
 
         private void UpdateHeroSlots(IReadOnlyList<HeroDataSO> selectedHeroes)
@@ -100,6 +95,44 @@ namespace CosmosCritters
                     if (slot.EmptyStateIndicator != null) slot.EmptyStateIndicator.SetActive(true);
                 }
             }
+
+            UpdateInteractionState(selectedHeroes);
+        }
+
+        private void UpdateInteractionState(IReadOnlyList<HeroDataSO> selectedHeroes)
+        {
+            int selectedCount = selectedHeroes != null ? selectedHeroes.Count : 0;
+
+            if (_startMatchButton != null)
+            {
+                _startMatchButton.interactable = selectedCount >= 1 && selectedCount <= 4;
+            }
+
+            bool reachedMaximum = selectedCount >= 4;
+            for (int i = 0; i < _heroSelectionButtons.Count; i++)
+            {
+                Button selectionButton = _heroSelectionButtons[i];
+                if (selectionButton == null) continue;
+
+                bool isSelected = _controller != null
+                    && i < _controller.AvailableHeroes.Count
+                    && selectedHeroes != null
+                    && IsHeroSelected(selectedHeroes, _controller.AvailableHeroes[i]);
+
+                // Al llegar a cuatro se bloquean solamente las opciones no elegidas.
+                // Las elegidas siguen activas para permitir deseleccionarlas.
+                selectionButton.interactable = !reachedMaximum || isSelected;
+            }
+        }
+
+        private static bool IsHeroSelected(IReadOnlyList<HeroDataSO> selectedHeroes, HeroDataSO hero)
+        {
+            for (int i = 0; i < selectedHeroes.Count; i++)
+            {
+                if (selectedHeroes[i] == hero) return true;
+            }
+
+            return false;
         }
 
         private void UpdateMapDisplay(int mapIndex)

@@ -214,7 +214,7 @@ MonoBehaviour:
           m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
           m_IntArgument: 0
           m_FloatArgument: 0
-          m_StringArgument: 
+          m_StringArgument:
           m_BoolArgument: 0
         m_CallState: 2
 --- !u!114 &40054235
@@ -2508,6 +2508,9 @@ MonoBehaviour:
   _mapText: {fileID: 0}
   _turnDurationText: {fileID: 885680224}
   _startMatchButton: {fileID: 1589111928}
+  _heroSelectionButtons:
+  - {fileID: 40054234}
+  - {fileID: 468842012}
 --- !u!1 &954612716
 GameObject:
   m_ObjectHideFlags: 0
@@ -3052,18 +3055,6 @@ MonoBehaviour:
         m_TargetAssemblyTypeName: CosmosCritters.MainMenuController, Assembly-CSharp
         m_MethodName: StartMatch
         m_Mode: 1
-        m_Arguments:
-          m_ObjectArgument: {fileID: 0}
-          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
-          m_IntArgument: 0
-          m_FloatArgument: 0
-          m_StringArgument: 
-          m_BoolArgument: 0
-        m_CallState: 2
-      - m_Target: {fileID: 939118315}
-        m_TargetAssemblyTypeName: CosmosCritters.MainMenuController, Assembly-CSharp
-        m_MethodName: SelectHeroByIndex
-        m_Mode: 3
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
           m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
