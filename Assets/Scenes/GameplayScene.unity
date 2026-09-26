@@ -3337,7 +3337,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6386949431173744980, guid: 499fdfcfffdd7d944891bdd2c27c8a70, type: 3}
       propertyPath: _aiController
-      value:
+      value: 
       objectReference: {fileID: 2587768585443396854}
     - target: {fileID: 6386949431173744980, guid: 499fdfcfffdd7d944891bdd2c27c8a70, type: 3}
       propertyPath: _characterName
@@ -3345,8 +3345,8 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8005036763429186368, guid: 499fdfcfffdd7d944891bdd2c27c8a70, type: 3}
       propertyPath: _bossWeapon
-      value:
-      objectReference: {fileID: 11400000, guid: 81c3e510842a4253a6f1947b1c412b03, type: 2}
+      value: 
+      objectReference: {fileID: 11400000, guid: 81c3e510842a4253a6f1947b1c412b02, type: 2}
     - target: {fileID: 8069464125093865826, guid: 499fdfcfffdd7d944891bdd2c27c8a70, type: 3}
       propertyPath: m_Name
       value: Boss
@@ -3365,8 +3365,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 3ea2fa53b6430c240a0fc52925af799f, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!114 &2587768585443396854 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 8005036763429186368, guid: 499fdfcfffdd7d944891bdd2c27c8a70, type: 3}

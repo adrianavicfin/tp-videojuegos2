@@ -35,6 +35,7 @@ namespace CosmosCritters
         public Rigidbody2D Rigidbody => _rb;
         public Transform Transform => transform;
         public float GravityResponse => _gravityResponse;
+        public float MaxLifetime => _maxLifetime;
 
         public void ApplyGravitationalPull(Vector2 force)
         {

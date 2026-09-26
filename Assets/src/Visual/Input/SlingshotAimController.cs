@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace CosmosCritters
 {
@@ -84,20 +85,31 @@ namespace CosmosCritters
             }
         }
 
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
-        private static void EnsureInstanceInScene()
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+        private static void RegisterSceneBootstrap()
         {
-            if (Instance == null && UnityEngine.Object.FindObjectOfType<SlingshotAimController>() == null)
+            SceneManager.sceneLoaded -= EnsureAimSystemInScene;
+            SceneManager.sceneLoaded += EnsureAimSystemInScene;
+        }
+
+        private static void EnsureAimSystemInScene(Scene scene, LoadSceneMode mode)
+        {
+            if (UnityEngine.Object.FindObjectOfType<TurnManager>() == null) return;
+
+            GameObject aimSystem = GameObject.Find("SlingshotAimSystem");
+            if (aimSystem == null)
             {
-                if (UnityEngine.Object.FindObjectOfType<TurnManager>() != null || UnityEngine.Object.FindObjectOfType<Hero>() != null)
-                {
-                    GameObject go = new GameObject("SlingshotAimSystem");
-                    go.AddComponent<SlingshotAimController>();
-                    go.AddComponent<JumpAimController>();
-                    go.AddComponent<TrajectoryPredictor>();
-                    Debug.Log("[Slingshot] AimSystem auto-creado y configurado en la escena de Gameplay.");
-                }
+                aimSystem = new GameObject("SlingshotAimSystem");
             }
+
+            if (UnityEngine.Object.FindObjectOfType<SlingshotAimController>() == null)
+                aimSystem.AddComponent<SlingshotAimController>();
+            if (UnityEngine.Object.FindObjectOfType<JumpAimController>() == null)
+                aimSystem.AddComponent<JumpAimController>();
+            if (UnityEngine.Object.FindObjectOfType<TrajectoryPredictor>() == null)
+                aimSystem.AddComponent<TrajectoryPredictor>();
+
+            Debug.Log("[AimSystem] Controles de disparo, salto y predicción disponibles en Gameplay.");
         }
 
         private Vector2 GetMouseWorldPosition()

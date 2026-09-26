@@ -1,5 +1,4 @@
 using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 
 namespace CosmosCritters
@@ -8,7 +7,7 @@ namespace CosmosCritters
     /// Controlador de Inteligencia Artificial para el Boss (H3-T8).
     /// Ejecuta la toma de decisiones por turno:
     /// 1. Búsqueda y selección táctica del objetivo (héroe vivo más cercano o con menor salud según la fase).
-    /// 2. Cálculo balístico / estimación de ángulo y potencia considerando la gravedad de los planetoides.
+    /// 2. Búsqueda de ángulo y potencia simulando la gravedad y las colisiones del proyectil.
     /// 3. Visualización previa o animación de apuntado y ejecución del disparo (ActionShoot).
     /// 4. Notificación al TurnManager del ciclo de resolución de la acción.
     /// </summary>
@@ -26,13 +25,13 @@ namespace CosmosCritters
         [Tooltip("Tiempo de anticipación / apuntado antes de disparar para dar feedback al jugador.")]
         [SerializeField] private float _aimDelaySeconds = 1.2f;
 
-        [Tooltip("Margen de dispersión o error intencional en grados según la fase.")]
-        [SerializeField] private float _angleInaccuracy = 4f;
-
-        [Tooltip("Fuerza del arco parabólico adicional para salvar curvaturas de planetoides.")]
-        [SerializeField] private float _loftFactor = 0.35f;
+        [Header("Ballistic Search")]
+        [SerializeField, Range(1f, 15f)] private float _angleStepDegrees = 5f;
+        [SerializeField, Range(2, 10)] private int _powerSamples = 6;
+        [SerializeField, Range(1, 50)] private int _candidatesPerFrame = 12;
 
         private Boss _boss;
+        private readonly RaycastHit2D[] _collisionHits = new RaycastHit2D[16];
 
         public WeaponDataSO BossWeapon => _bossWeapon;
 
@@ -81,10 +80,113 @@ namespace CosmosCritters
             // 3. Pausa de anticipación visual (simula tiempo de cálculo y mira del Boss)
             yield return new WaitForSeconds(_aimDelaySeconds);
 
-            // 4. Calcular vector de lanzamiento, ángulo y potencia
+            // El objetivo puede haber muerto durante la pausa de anticipación.
+            if (targetHero == null || targetHero.IsDead)
+            {
+                targetHero = SelectBestTarget();
+                if (targetHero == null)
+                {
+                    TurnManager.Instance?.NotifyActionResolved();
+                    yield break;
+                }
+            }
+
+            // 4. Buscar un tiro que realmente alcance al objetivo (o explote a su lado).
             Vector2 launchDirection;
             float launchPower;
-            CalculateBallisticParameters(targetHero.transform.position, out launchDirection, out launchPower);
+            float bestScore = float.PositiveInfinity;
+            launchDirection = ((Vector2)(targetHero.transform.position - transform.position)).normalized;
+            launchPower = _bossWeapon != null ? _bossWeapon.MaxPower : _defaultPower;
+
+            GameObject projectilePrefab = _bossWeapon != null ? _bossWeapon.ProjectilePrefab : null;
+            Rigidbody2D projectileBody = projectilePrefab != null ? projectilePrefab.GetComponent<Rigidbody2D>() : null;
+            Projectile projectile = projectilePrefab != null ? projectilePrefab.GetComponent<Projectile>() : null;
+            CircleCollider2D projectileCollider = projectilePrefab != null ? projectilePrefab.GetComponent<CircleCollider2D>() : null;
+            Collider2D targetCollider = targetHero.GetComponent<Collider2D>();
+
+            if (projectileBody != null && projectile != null && projectileCollider != null && targetCollider != null)
+            {
+                float mass = Mathf.Max(projectileBody.mass, 0.01f);
+                float radius = projectileCollider.radius * Mathf.Max(
+                    Mathf.Abs(projectilePrefab.transform.localScale.x), Mathf.Abs(projectilePrefab.transform.localScale.y));
+                float explosionRadius = _bossWeapon.ExplosionRadius;
+                float maxPower = Mathf.Max(_bossWeapon.MaxPower, 1f);
+                float directAngle = Mathf.Atan2(launchDirection.y, launchDirection.x) * Mathf.Rad2Deg;
+                int angleSamples = Mathf.CeilToInt(180f / _angleStepDegrees);
+                int evaluated = 0;
+
+                for (int angleIndex = 0; angleIndex <= angleSamples; angleIndex++)
+                {
+                    float angle = directAngle - 90f + angleIndex * (180f / angleSamples);
+                    Vector2 direction = new Vector2(Mathf.Cos(angle * Mathf.Deg2Rad), Mathf.Sin(angle * Mathf.Deg2Rad));
+
+                    for (int powerIndex = 0; powerIndex < _powerSamples; powerIndex++)
+                    {
+                        float power = maxPower * Mathf.Lerp(0.5f, 1f, (float)powerIndex / (_powerSamples - 1));
+                        float score = ScoreShot(direction, power, mass, radius, projectile.GravityResponse,
+                            projectile.MaxLifetime, explosionRadius, targetCollider);
+
+                        if (score < bestScore)
+                        {
+                            bestScore = score;
+                            launchDirection = direction;
+                            launchPower = power;
+                        }
+
+                        if (++evaluated % _candidatesPerFrame == 0)
+                        {
+                            yield return null;
+                        }
+                    }
+                }
+
+                // Afinar alrededor del mejor tiro grueso para no depender de saltos de 5 grados.
+                if (bestScore > -100f)
+                {
+                    float centerAngle = Mathf.Atan2(launchDirection.y, launchDirection.x) * Mathf.Rad2Deg;
+                    float centerPower = launchPower;
+                    float fineAngleStep = _angleStepDegrees / 5f;
+                    float finePowerStep = maxPower * 0.5f / (_powerSamples - 1) / 4f;
+
+                    for (int angleOffset = -5; angleOffset <= 5; angleOffset++)
+                    {
+                        float angle = (centerAngle + angleOffset * fineAngleStep) * Mathf.Deg2Rad;
+                        Vector2 direction = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle));
+
+                        for (int powerOffset = -4; powerOffset <= 4; powerOffset++)
+                        {
+                            float power = Mathf.Clamp(centerPower + powerOffset * finePowerStep, 1f, maxPower);
+                            float score = ScoreShot(direction, power, mass, radius, projectile.GravityResponse,
+                                projectile.MaxLifetime, explosionRadius, targetCollider);
+
+                            if (score < bestScore)
+                            {
+                                bestScore = score;
+                                launchDirection = direction;
+                                launchPower = power;
+                            }
+
+                            if (++evaluated % _candidatesPerFrame == 0)
+                            {
+                                yield return null;
+                            }
+                        }
+                    }
+                }
+
+                Debug.Log($"[BossAIController] Tiro elegido tras {evaluated} simulaciones. " +
+                    $"Puntaje: {bestScore:F2}, potencia: {launchPower:F1}.");
+            }
+            else
+            {
+                Debug.LogWarning("[BossAIController] Prefab o colliders incompletos; usando tiro directo como respaldo.");
+            }
+
+            if (targetHero == null || targetHero.IsDead)
+            {
+                TurnManager.Instance?.NotifyActionResolved();
+                yield break;
+            }
 
             // 5. Instanciar y disparar proyectil mediante Command ActionShoot
             ExecuteBossShoot(launchDirection, launchPower, targetHero);
@@ -98,78 +200,73 @@ namespace CosmosCritters
         public Hero SelectBestTarget()
         {
             Hero[] heroes = FindObjectsOfType<Hero>();
-            List<Hero> aliveHeroes = new List<Hero>();
-
+            Hero bestHero = null;
+            Vector2 bossPos = transform.position;
+            float bestDistance = float.PositiveInfinity;
             for (int i = 0; i < heroes.Length; i++)
             {
-                if (heroes[i] != null && !heroes[i].IsDead && heroes[i].gameObject.activeSelf)
+                Hero hero = heroes[i];
+                if (hero == null || hero.IsDead || !hero.gameObject.activeSelf) continue;
+                float distance = ((Vector2)hero.transform.position - bossPos).sqrMagnitude;
+                if (bestHero == null || (_boss.CurrentPhase >= 2
+                    ? hero.CurrentHealth < bestHero.CurrentHealth ||
+                      (hero.CurrentHealth == bestHero.CurrentHealth && distance < bestDistance)
+                    : distance < bestDistance))
                 {
-                    aliveHeroes.Add(heroes[i]);
+                    bestHero = hero;
+                    bestDistance = distance;
                 }
             }
 
-            if (aliveHeroes.Count == 0) return null;
-
-            Vector2 bossPos = transform.position;
-
-            if (_boss.CurrentPhase >= 2)
-            {
-                // Priorizar héroe con menor salud
-                Hero lowestHPHero = aliveHeroes[0];
-                for (int i = 1; i < aliveHeroes.Count; i++)
-                {
-                    if (aliveHeroes[i].CurrentHealth < lowestHPHero.CurrentHealth)
-                    {
-                        lowestHPHero = aliveHeroes[i];
-                    }
-                }
-                return lowestHPHero;
-            }
-            else
-            {
-                // Fase 1: Priorizar héroe más cercano
-                Hero closestHero = aliveHeroes[0];
-                float minDistanceSqr = Vector2.SqrMagnitude((Vector2)closestHero.transform.position - bossPos);
-
-                for (int i = 1; i < aliveHeroes.Count; i++)
-                {
-                    float distSqr = Vector2.SqrMagnitude((Vector2)aliveHeroes[i].transform.position - bossPos);
-                    if (distSqr < minDistanceSqr)
-                    {
-                        minDistanceSqr = distSqr;
-                        closestHero = aliveHeroes[i];
-                    }
-                }
-                return closestHero;
-            }
+            return bestHero;
         }
 
-        /// <summary>
-        /// Calcula la dirección y potencia del disparo hacia el objetivo considerando la normal de la superficie y la gravedad.
-        /// </summary>
-        public void CalculateBallisticParameters(Vector2 targetPos, out Vector2 launchDirection, out float launchPower)
+        private float ScoreShot(Vector2 direction, float power, float mass, float radius,
+            float gravityResponse, float maxLifetime, float explosionRadius, Collider2D target)
         {
-            Vector2 bossPos = transform.position;
-            Vector2 toTarget = targetPos - bossPos;
-            float distance = toTarget.magnitude;
+            Vector2 position = (Vector2)transform.position + direction * 1.2f;
+            Vector2 velocity = direction * (power / mass);
+            float step = Time.fixedDeltaTime;
+            int maxSteps = Mathf.CeilToInt(maxLifetime / step);
 
-            // Dirección base hacia el objetivo
-            Vector2 directDir = toTarget.sqrMagnitude > 0.001f ? toTarget.normalized : Vector2.right;
+            for (int i = 0; i < maxSteps; i++)
+            {
+                velocity += GravityBody.GetTotalGravitationalPull(position) * (gravityResponse / mass) * step;
+                Vector2 nextPosition = position + velocity * step;
+                Vector2 movement = nextPosition - position;
+                float distance = movement.magnitude;
+                if (distance < 0.0001f) continue;
+                int hitCount = Physics2D.CircleCastNonAlloc(position, radius, movement / distance,
+                    _collisionHits, distance);
+                RaycastHit2D nearest = default;
+                float nearestDistance = float.PositiveInfinity;
 
-            // Arco ascendente según la normal del Boss (transform.up) para contrarrestar la atracción radial
-            Vector2 upDir = (Vector2)transform.up;
-            Vector2 loftedDir = (directDir + upDir * _loftFactor).normalized;
+                for (int hitIndex = 0; hitIndex < hitCount; hitIndex++)
+                {
+                    Collider2D collider = _collisionHits[hitIndex].collider;
+                    if (collider == null || collider.isTrigger || collider.GetComponentInParent<Boss>() == _boss)
+                        continue;
+                    if (_collisionHits[hitIndex].distance < nearestDistance)
+                    {
+                        nearest = _collisionHits[hitIndex];
+                        nearestDistance = nearest.distance;
+                    }
+                }
 
-            // Aplicar dispersión aleatoria controlada
-            float phaseAccuracyModifier = Mathf.Max(0.5f, 1f - (_boss.CurrentPhase - 1) * 0.25f);
-            float randomAngleOffset = Random.Range(-_angleInaccuracy, _angleInaccuracy) * phaseAccuracyModifier;
-            Quaternion spreadRotation = Quaternion.Euler(0, 0, randomAngleOffset);
-            launchDirection = spreadRotation * loftedDir;
+                if (nearest.collider != null)
+                {
+                    if (nearest.collider == target || nearest.collider.transform.IsChildOf(target.transform))
+                        return -100f;
 
-            // Calcular potencia basada en distancia y límites del arma
-            float maxAllowedPower = _bossWeapon != null ? _bossWeapon.MaxPower : _defaultPower;
-            float estimatedPower = Mathf.Clamp(distance * 1.5f + 4f, 8f, maxAllowedPower);
-            launchPower = estimatedPower;
+                    Vector2 impactPosition = position + movement.normalized * nearestDistance;
+                    return Vector2.Distance(impactPosition, target.ClosestPoint(impactPosition)) - explosionRadius;
+                }
+
+                position = nextPosition;
+            }
+
+            // Sin impacto, el proyectil se extingue y no hace daño.
+            return 1000f + Vector2.Distance(position, target.ClosestPoint(position));
         }
 
         private void ExecuteBossShoot(Vector2 direction, float power, Character target)
