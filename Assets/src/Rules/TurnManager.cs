@@ -121,6 +121,11 @@ namespace CosmosCritters
                         // Slot seleccionado: activar e inicializar con los datos del menú
                         _heroSlots[i].gameObject.SetActive(true);
                         _heroSlots[i].Initialize(settings.SelectedHeroes[i], i + 1);
+
+                        if (_heroSlots[i].EquippedWeapon == null)
+                        {
+                            Debug.LogError($"[TurnManager] El heroe del slot {i + 1} ({_heroSlots[i].CharacterName}) no tiene arma configurada en su HeroDataSO.");
+                        }
                     }
                     else
                     {
@@ -128,6 +133,12 @@ namespace CosmosCritters
                         _heroSlots[i].gameObject.SetActive(false);
                     }
                 }
+
+                Debug.Log($"[TurnManager] Configuracion persistida aplicada: {selectedCount} heroes seleccionados.");
+            }
+            else
+            {
+                Debug.LogWarning("[TurnManager] GameplayScene se inicio sin configuracion persistida. Los slots conservaran su configuracion de escena.");
             }
         }
         #endregion

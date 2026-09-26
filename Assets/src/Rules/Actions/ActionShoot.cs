@@ -66,11 +66,7 @@ namespace CosmosCritters
             }
             else
             {
-                // Fallback directo por si se prueba sin Prefab físico
-                if (target != null && !target.IsDead)
-                {
-                    target.TakeDamage(Damage);
-                }
+                Debug.LogError($"[ActionShoot] {user.CharacterName} intento disparar sin ProjectilePrefab. Se cancela la accion para evitar daño invisible.");
 
                 if (TurnManager.Instance != null)
                 {

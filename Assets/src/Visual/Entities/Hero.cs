@@ -136,26 +136,49 @@ namespace CosmosCritters
 
         public void ExecuteShoot(float angle, float power, int damage, Character target = null)
         {
-            GameObject prefab = _equippedWeapon != null ? _equippedWeapon.ProjectilePrefab : null;
-            float radius = _equippedWeapon != null ? _equippedWeapon.ExplosionRadius : 2.5f;
-            float knockback = _equippedWeapon != null ? _equippedWeapon.KnockbackForce : 15f;
-            int finalDamage = _equippedWeapon != null ? _equippedWeapon.BaseDamage : damage;
+            if (!TryGetEquippedWeapon(out WeaponDataSO weapon)) return;
+
+            GameObject prefab = weapon.ProjectilePrefab;
+            float radius = weapon.ExplosionRadius;
+            float knockback = weapon.KnockbackForce;
+            int finalDamage = weapon.BaseDamage;
 
             ExecuteAction(new ActionShoot(angle, power, finalDamage, prefab, radius, knockback), target);
         }
 
         public void ExecuteShoot(Vector2 direction, float power)
         {
+            if (!TryGetEquippedWeapon(out WeaponDataSO weapon)) return;
+
             float angle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
-            float maxPower = _equippedWeapon != null ? _equippedWeapon.MaxPower : 25f;
+            float maxPower = weapon.MaxPower;
             float clampedPower = Mathf.Clamp(power, 1f, maxPower);
 
-            GameObject prefab = _equippedWeapon != null ? _equippedWeapon.ProjectilePrefab : null;
-            float radius = _equippedWeapon != null ? _equippedWeapon.ExplosionRadius : 2.5f;
-            float knockback = _equippedWeapon != null ? _equippedWeapon.KnockbackForce : 15f;
-            int damage = _equippedWeapon != null ? _equippedWeapon.BaseDamage : 35;
+            GameObject prefab = weapon.ProjectilePrefab;
+            float radius = weapon.ExplosionRadius;
+            float knockback = weapon.KnockbackForce;
+            int damage = weapon.BaseDamage;
 
             ExecuteAction(new ActionShoot(angle, clampedPower, damage, prefab, radius, knockback), null);
+        }
+
+        private bool TryGetEquippedWeapon(out WeaponDataSO weapon)
+        {
+            weapon = _equippedWeapon;
+
+            if (weapon == null)
+            {
+                Debug.LogError($"[Hero] {_characterName} no puede disparar: no tiene WeaponDataSO. Verificar la persistencia MainMenu -> GameplayScene y DefaultWeapon en HeroDataSO.");
+                return false;
+            }
+
+            if (weapon.ProjectilePrefab == null)
+            {
+                Debug.LogError($"[Hero] {_characterName} no puede disparar: el arma {weapon.WeaponName} no tiene ProjectilePrefab.");
+                return false;
+            }
+
+            return true;
         }
 
         public void ExecuteSecondaryAbility(Character target = null)
