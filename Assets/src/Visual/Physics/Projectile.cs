@@ -217,7 +217,8 @@ namespace CosmosCritters
                     else
                     {
                         character.TakeDamage(_damage);
-                        character.ApplyGravitationalPull(direction * _knockbackForce);
+                        if (!character.IsDead)
+                            character.ApplyGravitationalPull(direction * _knockbackForce);
                     }
                 }
                 // 2. Caso B: Es una Cobertura Destructible (DestructibleCover)

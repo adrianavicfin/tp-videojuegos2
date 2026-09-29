@@ -319,6 +319,12 @@ namespace CosmosCritters
             {
                 TriggerMatchEnd(false);
             }
+            else if (_activeCharacter != null && _activeCharacter.IsDead &&
+                     _currentPhase == TurnPhase.WaitingInput)
+            {
+                // Una muerte por KillZone fuera de un disparo no debe dejar el turno vacío.
+                EndCurrentTurn();
+            }
         }
 
         private void CheckEndGameConditions()
