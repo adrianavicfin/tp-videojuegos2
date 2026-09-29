@@ -30,7 +30,14 @@ namespace CosmosCritters
         [SerializeField, Range(2, 10)] private int _powerSamples = 6;
         [SerializeField, Range(1, 50)] private int _candidatesPerFrame = 12;
 
+        [Header("Tactical Movement")]
+        [SerializeField, Range(0f, 3f)] private float _walkDuration = 0.8f;
+        [SerializeField, Range(1, 6)] private int _jumpEveryTurns = 3;
+        [SerializeField, Range(1f, 8f)] private float _landingTimeout = 4f;
+
         private Boss _boss;
+        private CharacterMovementController _movement;
+        private int _turnCount;
         private readonly RaycastHit2D[] _collisionHits = new RaycastHit2D[16];
 
         public WeaponDataSO BossWeapon => _bossWeapon;
@@ -38,6 +45,7 @@ namespace CosmosCritters
         private void Awake()
         {
             _boss = GetComponent<Boss>();
+            _movement = GetComponent<CharacterMovementController>();
 
             // Si no se asignó arma en el Inspector, cargar HeavyMissile por defecto
             if (_bossWeapon == null)
@@ -56,6 +64,7 @@ namespace CosmosCritters
 
         private IEnumerator ExecuteAITurnRoutine()
         {
+            _turnCount++;
             Debug.Log($"[BossAIController] {_boss.CharacterName} evaluando campo de batalla en Fase {_boss.CurrentPhase}...");
 
             // 1. Notificar al TurnManager que una acción está en preparación/ejecución
@@ -77,7 +86,47 @@ namespace CosmosCritters
 
             Debug.Log($"[BossAIController] Objetivo fijado: {targetHero.CharacterName} (Salud: {targetHero.CurrentHealth}/{targetHero.MaxHealth})");
 
-            // 3. Pausa de anticipación visual (simula tiempo de cálculo y mira del Boss)
+            // 3. Alternar entre acercamiento, búsqueda de ocultamiento y salto viable.
+            if (_movement == null) _movement = GetComponent<CharacterMovementController>();
+            if (_movement != null && _movement.IsGrounded && _turnCount % _jumpEveryTurns == 0 &&
+                TryPlanInterplanetaryJump(targetHero, out Vector2 jumpDirection, out float jumpSpeed,
+                    out GravityBody destination))
+            {
+                Debug.Log($"[BossAIController] Salto táctico hacia {destination.name}: dirección {jumpDirection}, velocidad {jumpSpeed:F1}.");
+                new ActionJump(jumpDirection, jumpSpeed).Execute(_boss);
+
+                float deadline = Time.time + _landingTimeout;
+                yield return new WaitForSeconds(0.4f);
+                while (Time.time < deadline && !_boss.IsDead &&
+                    (!IsNearPlanet(_boss.transform.position, destination, 2.5f) || !_movement.IsGrounded))
+                {
+                    yield return null;
+                }
+
+                if (_boss.IsDead) yield break;
+                if (!_movement.IsGrounded || !IsNearPlanet(_boss.transform.position, destination, 2.5f))
+                {
+                    Debug.LogWarning("[BossAIController] El salto no terminó en el planeta previsto; se cede el turno sin disparar.");
+                    TurnManager.Instance?.NotifyActionResolved();
+                    yield break;
+                }
+            }
+            else if (_movement != null && _movement.IsGrounded && _walkDuration > 0f && _turnCount % 3 != 0)
+            {
+                Vector2 toHero = targetHero.transform.position - transform.position;
+                float towardHero = Mathf.Sign(Vector2.Dot(_movement.SurfaceTangent, toHero));
+                bool seekOcclusion = _boss.CurrentPhase >= 2 && HasClearLineOfSight(targetHero);
+                float walkInput = seekOcclusion ? -towardHero : towardHero;
+                _movement.SetAutonomousHorizontalInput(walkInput);
+                Debug.Log(seekOcclusion
+                    ? "[BossAIController] Buscando ocultamiento detrás del planeta."
+                    : "[BossAIController] Reposicionándose sobre la superficie.");
+                yield return new WaitForSeconds(_walkDuration);
+                _movement.SetAutonomousHorizontalInput(0f);
+                if (_boss.IsDead) yield break;
+            }
+
+            // 4. Pausa de anticipación visual (simula tiempo de cálculo y mira del Boss)
             yield return new WaitForSeconds(_aimDelaySeconds);
 
             // El objetivo puede haber muerto durante la pausa de anticipación.
@@ -96,7 +145,9 @@ namespace CosmosCritters
             float launchPower;
             float bestScore = float.PositiveInfinity;
             launchDirection = ((Vector2)(targetHero.transform.position - transform.position)).normalized;
-            launchPower = _bossWeapon != null ? _bossWeapon.MaxPower : _defaultPower;
+            float phasePowerMultiplier = _boss.AttackPowerMultiplier;
+            launchPower = Mathf.Clamp((_bossWeapon != null ? _bossWeapon.MaxPower : _defaultPower)
+                * phasePowerMultiplier, 1f, 100f);
 
             GameObject projectilePrefab = _bossWeapon != null ? _bossWeapon.ProjectilePrefab : null;
             Rigidbody2D projectileBody = projectilePrefab != null ? projectilePrefab.GetComponent<Rigidbody2D>() : null;
@@ -109,8 +160,11 @@ namespace CosmosCritters
                 float mass = Mathf.Max(projectileBody.mass, 0.01f);
                 float radius = projectileCollider.radius * Mathf.Max(
                     Mathf.Abs(projectilePrefab.transform.localScale.x), Mathf.Abs(projectilePrefab.transform.localScale.y));
-                float explosionRadius = _bossWeapon.ExplosionRadius;
-                float maxPower = Mathf.Max(_bossWeapon.MaxPower, 1f);
+                float explosionRadius = _bossWeapon.ExplosionRadius * _boss.AttackRadiusMultiplier;
+                float maxPower = launchPower;
+                float minPower = _boss.CurrentPhase >= 2
+                    ? Mathf.Min(maxPower, _bossWeapon.MaxPower * 1.05f)
+                    : maxPower * 0.5f;
                 float directAngle = Mathf.Atan2(launchDirection.y, launchDirection.x) * Mathf.Rad2Deg;
                 int angleSamples = Mathf.CeilToInt(180f / _angleStepDegrees);
                 int evaluated = 0;
@@ -122,7 +176,7 @@ namespace CosmosCritters
 
                     for (int powerIndex = 0; powerIndex < _powerSamples; powerIndex++)
                     {
-                        float power = maxPower * Mathf.Lerp(0.5f, 1f, (float)powerIndex / (_powerSamples - 1));
+                        float power = Mathf.Lerp(minPower, maxPower, (float)powerIndex / (_powerSamples - 1));
                         float score = ScoreShot(direction, power, mass, radius, projectile.GravityResponse,
                             projectile.MaxLifetime, explosionRadius, targetCollider);
 
@@ -146,7 +200,7 @@ namespace CosmosCritters
                     float centerAngle = Mathf.Atan2(launchDirection.y, launchDirection.x) * Mathf.Rad2Deg;
                     float centerPower = launchPower;
                     float fineAngleStep = _angleStepDegrees / 5f;
-                    float finePowerStep = maxPower * 0.5f / (_powerSamples - 1) / 4f;
+                    float finePowerStep = (maxPower - minPower) / (_powerSamples - 1) / 4f;
 
                     for (int angleOffset = -5; angleOffset <= 5; angleOffset++)
                     {
@@ -155,7 +209,7 @@ namespace CosmosCritters
 
                         for (int powerOffset = -4; powerOffset <= 4; powerOffset++)
                         {
-                            float power = Mathf.Clamp(centerPower + powerOffset * finePowerStep, 1f, maxPower);
+                            float power = Mathf.Clamp(centerPower + powerOffset * finePowerStep, minPower, maxPower);
                             float score = ScoreShot(direction, power, mass, radius, projectile.GravityResponse,
                                 projectile.MaxLifetime, explosionRadius, targetCollider);
 
@@ -221,6 +275,157 @@ namespace CosmosCritters
             return bestHero;
         }
 
+        private bool HasClearLineOfSight(Hero target)
+        {
+            Vector2 origin = target.transform.position;
+            Vector2 towardBoss = (Vector2)transform.position - origin;
+            float distance = towardBoss.magnitude;
+            if (distance < 0.01f) return true;
+
+            int hitCount = Physics2D.RaycastNonAlloc(origin, towardBoss / distance, _collisionHits,
+                distance, 1 << LayerMask.NameToLayer("Ground"));
+            for (int i = 0; i < hitCount; i++)
+            {
+                if (_collisionHits[i].collider != null && _collisionHits[i].distance > 1.5f &&
+                    _collisionHits[i].distance < distance - 1.5f)
+                    return false;
+            }
+
+            return true;
+        }
+
+        private bool TryPlanInterplanetaryJump(Hero target, out Vector2 direction,
+            out float speed, out GravityBody destination)
+        {
+            direction = Vector2.zero;
+            speed = 0f;
+            destination = FindClosestPlanet(target.transform.position);
+            GravityBody source = FindClosestPlanet(transform.position);
+            if (source == null || destination == null || source == destination || _boss.Rigidbody == null)
+                return false;
+
+            float bossRadius = _boss.GetComponent<Collider2D>().bounds.extents.magnitude;
+            if (!IsNearPlanet(transform.position, source, 3f)) return false;
+
+            Vector2 surfaceNormal = ((Vector2)transform.position - source.Position).normalized;
+            KillZoneView killZone = FindObjectOfType<KillZoneView>();
+            Collider2D boundary = killZone != null ? killZone.GetComponent<Collider2D>() : null;
+            Bounds mapBounds = boundary != null ? boundary.bounds : new Bounds(Vector3.zero, new Vector3(200f, 200f, 1f));
+            float bestScore = float.PositiveInfinity;
+            var activeBodies = GravityBody.AllBodies;
+            GravityBody[] planets = new GravityBody[activeBodies.Count];
+            float[] planetRadii = new float[activeBodies.Count];
+            int planetCount = 0;
+            int groundLayer = LayerMask.NameToLayer("Ground");
+            for (int i = 0; i < activeBodies.Count; i++)
+            {
+                GravityBody planet = activeBodies[i];
+                if (planet == null || planet.gameObject.layer != groundLayer) continue;
+                planets[planetCount] = planet;
+                planetRadii[planetCount] = GetPlanetRadius(planet);
+                planetCount++;
+            }
+
+            for (int angle = -80; angle <= 80; angle += 10)
+            {
+                Vector2 candidateDirection = Quaternion.Euler(0f, 0f, angle) * surfaceNormal;
+                for (float candidateSpeed = 32f; candidateSpeed <= 64f; candidateSpeed += 4f)
+                {
+                    if (!SimulateLanding(candidateDirection, candidateSpeed, source, destination,
+                        bossRadius, mapBounds, planets, planetRadii, planetCount,
+                        out Vector2 landingPoint)) continue;
+
+                    float score = ((Vector2)target.transform.position - landingPoint).sqrMagnitude;
+                    if (score < bestScore)
+                    {
+                        bestScore = score;
+                        direction = candidateDirection;
+                        speed = candidateSpeed;
+                    }
+                }
+            }
+
+            return bestScore < float.PositiveInfinity;
+        }
+
+        private bool SimulateLanding(Vector2 direction, float speed, GravityBody source,
+            GravityBody destination, float bossRadius, Bounds mapBounds, GravityBody[] planets,
+            float[] planetRadii, int planetCount, out Vector2 landingPoint)
+        {
+            landingPoint = Vector2.zero;
+            Vector2 position = transform.position;
+            Vector2 velocity = direction * speed;
+            float step = Time.fixedDeltaTime;
+            float mass = Mathf.Max(_boss.Rigidbody.mass, 0.01f);
+            bool clearedSource = false;
+            float initialSourceSurface = Vector2.Distance(position, source.Position) - GetPlanetRadius(source);
+            for (float elapsed = 0f; elapsed < _landingTimeout; elapsed += step)
+            {
+                velocity += GravityBody.GetTotalGravitationalPull(position) *
+                    (_boss.GravityMultiplier / mass) * step;
+                position += velocity * step;
+
+                if (position.x < mapBounds.min.x + bossRadius || position.x > mapBounds.max.x - bossRadius ||
+                    position.y < mapBounds.min.y + bossRadius || position.y > mapBounds.max.y - bossRadius)
+                    return false;
+
+                for (int i = 0; i < planetCount; i++)
+                {
+                    GravityBody planet = planets[i];
+                    if (planet == null) continue;
+                    float surfaceDistance = Vector2.Distance(position, planet.Position) - planetRadii[i];
+
+                    if (planet == source)
+                    {
+                        if (!clearedSource && surfaceDistance < initialSourceSurface - 0.3f) return false;
+                        if (surfaceDistance > bossRadius + 0.5f) clearedSource = true;
+                        else if (clearedSource && surfaceDistance <= bossRadius) return false;
+                    }
+                    else if (surfaceDistance <= bossRadius)
+                    {
+                        if (planet != destination || elapsed < 0.4f) return false;
+                        landingPoint = position;
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        private static GravityBody FindClosestPlanet(Vector2 point)
+        {
+            GravityBody closest = null;
+            float nearestSurface = float.PositiveInfinity;
+            var planets = GravityBody.AllBodies;
+            for (int i = 0; i < planets.Count; i++)
+            {
+                GravityBody planet = planets[i];
+                if (planet == null || planet.gameObject.layer != LayerMask.NameToLayer("Ground")) continue;
+                float surfaceDistance = Mathf.Abs(Vector2.Distance(point, planet.Position) - GetPlanetRadius(planet));
+                if (surfaceDistance < nearestSurface)
+                {
+                    nearestSurface = surfaceDistance;
+                    closest = planet;
+                }
+            }
+            return closest;
+        }
+
+        private static bool IsNearPlanet(Vector2 point, GravityBody planet, float tolerance)
+        {
+            return planet != null &&
+                Mathf.Abs(Vector2.Distance(point, planet.Position) - GetPlanetRadius(planet)) <= tolerance;
+        }
+
+        private static float GetPlanetRadius(GravityBody planet)
+        {
+            CircleCollider2D collider = planet.GetComponent<CircleCollider2D>();
+            return collider != null
+                ? collider.radius * Mathf.Max(Mathf.Abs(planet.transform.lossyScale.x), Mathf.Abs(planet.transform.lossyScale.y))
+                : 0f;
+        }
+
         private float ScoreShot(Vector2 direction, float power, float mass, float radius,
             float gravityResponse, float maxLifetime, float explosionRadius, Collider2D target)
         {
@@ -272,12 +477,14 @@ namespace CosmosCritters
         private void ExecuteBossShoot(Vector2 direction, float power, Character target)
         {
             float angle = Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg;
-            int damage = _bossWeapon != null ? _bossWeapon.BaseDamage : _defaultDamage;
-            float radius = _bossWeapon != null ? _bossWeapon.ExplosionRadius : _explosionRadius;
+            int damage = Mathf.RoundToInt((_bossWeapon != null ? _bossWeapon.BaseDamage : _defaultDamage)
+                * _boss.AttackDamageMultiplier);
+            float radius = (_bossWeapon != null ? _bossWeapon.ExplosionRadius : _explosionRadius)
+                * _boss.AttackRadiusMultiplier;
             float knockback = _bossWeapon != null ? _bossWeapon.KnockbackForce : _knockbackForce;
             GameObject prefab = _bossWeapon != null ? _bossWeapon.ProjectilePrefab : null;
 
-            Debug.Log($"[BossAIController] {_boss.CharacterName} dispara contra {target?.CharacterName}! Ángulo: {angle:F1}°, Potencia: {power:F1}, Daño: {damage}, Prefab: {(prefab != null ? prefab.name : "null")}");
+            Debug.Log($"[BossAIController] {_boss.CharacterName} (Fase {_boss.CurrentPhase}) dispara contra {target?.CharacterName}! Ángulo: {angle:F1}°, Potencia: {power:F1}, Daño: {damage}, Radio: {radius:F1}, Prefab: {(prefab != null ? prefab.name : "null")}");
 
             ICharacterAction shootAction = new ActionShoot(angle, power, damage, prefab, radius, knockback);
 

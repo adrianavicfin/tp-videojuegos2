@@ -29,6 +29,7 @@ namespace CosmosCritters
         private SpriteRenderer _spriteRenderer;
 
         private float _horizontalInput = 0f;
+        private float _autonomousHorizontalInput = 0f;
         private bool _isGrounded = true;
         private float _jumpCooldownTimer = 0f;
         private Vector2 _surfaceNormal = Vector2.up;
@@ -39,6 +40,11 @@ namespace CosmosCritters
         public bool IsGrounded => _isGrounded;
         public Vector2 SurfaceNormal => _surfaceNormal;
         public Vector2 SurfaceTangent => _surfaceTangent;
+
+        public void SetAutonomousHorizontalInput(float input)
+        {
+            _autonomousHorizontalInput = Mathf.Clamp(input, -1f, 1f);
+        }
 
         /// <summary>
         /// Aplica un impulso de salto deshabilitando temporalmente el chequeo de suelo para permitir el despegue físico.
@@ -79,15 +85,15 @@ namespace CosmosCritters
                 return;
             }
 
-            // El salto se apunta desde JumpAimController; mientras tanto no caminar.
-            if (JumpAimController.Instance != null && JumpAimController.Instance.IsAimingJump)
+            // El salto del jugador se apunta desde JumpAimController.
+            if (_character is Hero && JumpAimController.Instance != null && JumpAimController.Instance.IsAimingJump)
             {
                 _horizontalInput = 0f;
                 return;
             }
 
-            // Capturar entrada horizontal del jugador (A/D o flechas).
-            _horizontalInput = Input.GetAxisRaw("Horizontal");
+            // Los enemigos nunca reciben movimiento desde el teclado del jugador.
+            _horizontalInput = _character is Hero ? Input.GetAxisRaw("Horizontal") : _autonomousHorizontalInput;
 
             // Voltear el sprite según la dirección de marcha relativa
             if (_spriteRenderer != null && Mathf.Abs(_horizontalInput) > 0.05f)
@@ -120,11 +126,18 @@ namespace CosmosCritters
             // Si hay TurnManager, solo se mueve el personaje que tiene el turno activo en WaitingInput
             if (TurnManager.Instance != null)
             {
-                if (TurnManager.Instance.CurrentPhase != TurnPhase.WaitingInput) return false;
                 if (TurnManager.Instance.ActiveCharacter != _character) return false;
+                if (_character is Hero && TurnManager.Instance.CurrentPhase != TurnPhase.WaitingInput) return false;
+                if (_character is Boss && TurnManager.Instance.CurrentPhase != TurnPhase.ActionExecuting) return false;
             }
 
             return true;
+        }
+
+        private void OnDisable()
+        {
+            _autonomousHorizontalInput = 0f;
+            _horizontalInput = 0f;
         }
 
         /// <summary>

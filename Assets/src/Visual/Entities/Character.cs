@@ -100,7 +100,15 @@ namespace CosmosCritters
         }
 
         private void HandleStatsHealthChanged(int current, int max) => OnHealthChanged?.Invoke(current, max);
-        private void HandleStatsDied() => OnDied?.Invoke();
+        private void HandleStatsDied()
+        {
+            // Notificar primero: TurnManager y HUD todavía pueden consultar esta entidad.
+            OnDied?.Invoke();
+
+            // Conservar la referencia para la cola de turnos, pero quitar al combatiente
+            // de la escena visible y de la simulación física.
+            gameObject.SetActive(false);
+        }
         #endregion
 
         #region Physics & Radial Gravity (FixedUpdate)
