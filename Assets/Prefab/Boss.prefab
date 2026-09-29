@@ -184,6 +184,12 @@ MonoBehaviour:
   _currentPhase: 1
   _totalPhases: 3
   _aiController: {fileID: 0}
+  _phaseTwoColor: {r: 1, g: 0.38, b: 0.08, a: 1}
+  _phaseThreeColor: {r: 1, g: 0.08, b: 0.55, a: 1}
+  _phaseTwoPowerMultiplier: 1.25
+  _phaseThreePowerMultiplier: 1.35
+  _phaseThreeDamageMultiplier: 1.5
+  _phaseThreeRadiusMultiplier: 1.25
 --- !u!114 &8005036763429186368
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -205,3 +211,6 @@ MonoBehaviour:
   _angleStepDegrees: 5
   _powerSamples: 6
   _candidatesPerFrame: 12
+  _walkDuration: 0.8
+  _jumpEveryTurns: 3
+  _landingTimeout: 4
